@@ -9,6 +9,7 @@
     <version>1.0.0-SNAPSHOT</version>
     <modules>
         <module>code-vs-exception</module>
+        <module>arithmetic</module>
     </modules>
 
 </project>
