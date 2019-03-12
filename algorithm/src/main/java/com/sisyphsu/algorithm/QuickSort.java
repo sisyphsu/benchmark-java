@@ -23,10 +23,12 @@ public class QuickSort {
 
         // 分别从两端遍历数组进行分组排序, 此时arr[low]处于闲置状态
         while (low < high) {
+
             // 从右侧寻找比baseVal小的一个数, 找到后将它挪至low上, 之后arr[high]将处于闲置状态
             for (; high > low; high--) {
                 if (arr[high] < baseVal) {
                     arr[low] = arr[high];
+                    low++;
                     break;
                 }
             }
@@ -35,6 +37,7 @@ public class QuickSort {
             for (; high > low; low++) {
                 if (arr[low] > baseVal) {
                     arr[high] = arr[low];
+                    high--;
                     break;
                 }
             }
@@ -48,6 +51,21 @@ public class QuickSort {
         if (to - low > 1) {
             sort(arr, low + 1, to);
         }
+    }
+
+    /**
+     * 判断是否有序
+     *
+     * @param arr 数组
+     * @return true|false
+     */
+    public static boolean isSorted(int[] arr) {
+        for (int i = 0; i < arr.length - 2; i++) {
+            if (arr[i] > arr[i + 1]) {
+                return false;
+            }
+        }
+        return true;
     }
 
 }
