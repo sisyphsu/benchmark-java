@@ -4,13 +4,14 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.github.sisyphsu</groupId>
-    <artifactId>benchmark</artifactId>
+    <artifactId>benchmark-parent</artifactId>
     <packaging>pom</packaging>
     <version>1.0.0-SNAPSHOT</version>
 
     <modules>
         <module>code-vs-exception</module>
         <module>algorithm</module>
+        <module>benchmark</module>
     </modules>
 
     <build>
