@@ -1,6 +1,8 @@
 package com.github.sisyphsu.benchmark.reflect;
 
 import org.openjdk.jmh.annotations.*;
+import sun.reflect.MethodAccessor;
+import sun.reflect.ReflectionFactory;
 
 import java.lang.reflect.Method;
 import java.util.concurrent.TimeUnit;
@@ -9,10 +11,12 @@ import java.util.concurrent.TimeUnit;
  * 反射的性能测试
  * <p>
  * 方法调用
- * Benchmark                      Mode  Cnt  Score    Error  Units
- * ReflectBenchmark.direct        avgt    9  0.026 ±  0.001  us/op
- * ReflectBenchmark.reflect       avgt    9  0.147 ±  0.004  us/op
- * ReflectBenchmark.reflectCache  avgt    9  0.028 ±  0.001  us/op
+ * Benchmark                         Mode  Cnt  Score    Error  Units
+ * ReflectBenchmark.direct           avgt    9  0.026 ±  0.001  us/op
+ * ReflectBenchmark.reflect          avgt    9  0.147 ±  0.002  us/op
+ * ReflectBenchmark.reflectMethod    avgt    9  0.028 ±  0.001  us/op
+ * ReflectBenchmark.reflectAccessor  avgt    9  0.026 ±  0.001  us/op
+ * s
  *
  * @author sulin
  * @since 2019-05-13 20:49:14
@@ -26,6 +30,7 @@ public class ReflectBenchmark {
 
     private static final ReflectBenchmark B = new ReflectBenchmark();
     private static final Method method;
+    private static final MethodAccessor accessor;
 
     static {
         try {
@@ -33,6 +38,7 @@ public class ReflectBenchmark {
         } catch (NoSuchMethodException e) {
             throw new RuntimeException(e);
         }
+        accessor = ReflectionFactory.getReflectionFactory().newMethodAccessor(method);
     }
 
     @Benchmark
@@ -46,8 +52,13 @@ public class ReflectBenchmark {
     }
 
     @Benchmark
-    public void reflectCache() throws Exception {
+    public void reflectMethod() throws Exception {
         Object ms = method.invoke(B);
+    }
+
+    @Benchmark
+    public void reflectAccessor() throws Exception {
+        Object ms = accessor.invoke(B, null);
     }
 
     public long now() {
@@ -58,6 +69,7 @@ public class ReflectBenchmark {
         ReflectBenchmark b = new ReflectBenchmark();
         b.direct();
         b.reflect();
+        b.reflectAccessor();
     }
 
 }
