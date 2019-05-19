@@ -1,5 +1,7 @@
 package com.github.sisyphsu.benchmark.reflect;
 
+import net.sf.cglib.reflect.FastClass;
+import net.sf.cglib.reflect.FastMethod;
 import org.openjdk.jmh.annotations.*;
 import sun.reflect.MethodAccessor;
 import sun.reflect.ReflectionFactory;
@@ -16,7 +18,14 @@ import java.util.concurrent.TimeUnit;
  * ReflectBenchmark.reflect          avgt    9  0.147 ±  0.002  us/op
  * ReflectBenchmark.reflectMethod    avgt    9  0.028 ±  0.001  us/op
  * ReflectBenchmark.reflectAccessor  avgt    9  0.026 ±  0.001  us/op
- * s
+ * <p>
+ * 增加Cglib、改用ns
+ * Benchmark                         Mode  Cnt    Score   Error  Units
+ * ReflectBenchmark.direct           avgt    9   25.497 ± 0.170  ns/op
+ * ReflectBenchmark.reflect          avgt    9  149.775 ± 1.556  ns/op
+ * ReflectBenchmark.reflectAccessor  avgt    9   26.033 ± 0.561  ns/op
+ * ReflectBenchmark.reflectCglib     avgt    9   28.733 ± 1.328  ns/op
+ * ReflectBenchmark.reflectMethod    avgt    9   28.446 ± 0.715  ns/op
  *
  * @author sulin
  * @since 2019-05-13 20:49:14
@@ -25,12 +34,15 @@ import java.util.concurrent.TimeUnit;
 @BenchmarkMode(Mode.AverageTime)
 @Fork(3)
 @Measurement(iterations = 3, time = 3)
-@OutputTimeUnit(TimeUnit.MICROSECONDS)
+@OutputTimeUnit(TimeUnit.NANOSECONDS)
 public class ReflectBenchmark {
 
     private static final ReflectBenchmark B = new ReflectBenchmark();
     private static final Method method;
     private static final MethodAccessor accessor;
+
+    private static final FastClass cglibClass;
+    private static final FastMethod cglibMethod;
 
     static {
         try {
@@ -39,6 +51,8 @@ public class ReflectBenchmark {
             throw new RuntimeException(e);
         }
         accessor = ReflectionFactory.getReflectionFactory().newMethodAccessor(method);
+        cglibClass = FastClass.create(B.getClass());
+        cglibMethod = cglibClass.getMethod(method);
     }
 
     @Benchmark
@@ -61,6 +75,11 @@ public class ReflectBenchmark {
         Object ms = accessor.invoke(B, null);
     }
 
+    @Benchmark
+    public void reflectCglib() throws Exception {
+        Object ms = cglibMethod.invoke(B, null);
+    }
+
     public long now() {
         return System.currentTimeMillis();
     }
@@ -70,6 +89,7 @@ public class ReflectBenchmark {
         b.direct();
         b.reflect();
         b.reflectAccessor();
+        b.reflectCglib();
     }
 
 }
