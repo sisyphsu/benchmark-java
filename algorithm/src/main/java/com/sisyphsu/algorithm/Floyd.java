@@ -62,6 +62,9 @@ public class Floyd {
         List<FinalPath> result = new ArrayList<>();
         for (int i = 0; i < routers.length; i++) {
             for (int j = 0; j < routers.length; j++) {
+                if (i == j) {
+                    continue;
+                }
                 char start = vertexs.get(i);
                 char end = vertexs.get(j);
                 Integer dist = dists[i][j];
