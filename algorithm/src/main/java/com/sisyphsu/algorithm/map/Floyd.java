@@ -1,6 +1,7 @@
-package com.sisyphsu.algorithm;
+package com.sisyphsu.algorithm.map;
 
-import lombok.Getter;
+import com.sisyphsu.algorithm.map.pojo.FinalPath;
+import com.sisyphsu.algorithm.map.pojo.Path;
 
 import java.util.*;
 
@@ -104,40 +105,4 @@ public class Floyd {
         return result;
     }
 
-    /**
-     * 最短路径
-     */
-    @Getter
-    static class FinalPath {
-        private final char start;
-        private final char end;
-        private final Integer dist;
-        private final List<Character> way;
-
-        public FinalPath(char start, char end, Integer dist, List<Character> way) {
-            this.start = start;
-            this.end = end;
-            this.dist = dist;
-            this.way = way;
-        }
-    }
-
-    /**
-     * 单向路径
-     */
-    static class Path {
-
-        private char start;
-        private char end;
-        private int distance;
-
-        public static Path valueOf(char start, char end, int dist) {
-            Path path = new Path();
-            path.start = start;
-            path.end = end;
-            path.distance = dist;
-            return path;
-        }
-
-    }
 }
