@@ -1,5 +1,6 @@
 package com.github.sisyphsu.benchmark.lang;
 
+import com.github.sisyphsu.benchmark.Runner;
 import lombok.extern.slf4j.Slf4j;
 import org.openjdk.jmh.annotations.*;
 
@@ -9,10 +10,11 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * 测试instanceOf、isInstance、isAssignableFrom的性能：
- * Benchmark                                 Mode  Cnt  Score   Error  Units
- * InstanceOfBenchmark.testInstanceOf        avgt    9  1.854 ± 0.059  ns/op
- * InstanceOfBenchmark.testIsAssignableFrom  avgt    9  1.824 ± 0.011  ns/op
- * InstanceOfBenchmark.testIsInstance        avgt    9  1.817 ± 0.010  ns/op
+ * <p>
+ * Benchmark                                     Mode  Cnt   Score    Error   Units
+ * InstanceOfBenchmark.testInstanceOf            avgt    9   1.838 ±  0.018   ns/op
+ * InstanceOfBenchmark.testIsAssignableFrom      avgt    9   1.833 ±  0.015   ns/op
+ * InstanceOfBenchmark.testIsInstance            avgt    9   1.825 ±  0.007   ns/op
  * <p>
  * 参考：https://stackoverflow.com/questions/496928/what-is-the-difference-between-instanceof-and-class-isassignablefrom
  *
@@ -42,6 +44,10 @@ public class InstanceOfBenchmark {
     @Benchmark
     public boolean testIsAssignableFrom() {
         return List.class.isAssignableFrom(list.getClass());
+    }
+
+    public static void main(String[] args) throws Exception {
+        Runner.run(InstanceOfBenchmark.class);
     }
 
 }
