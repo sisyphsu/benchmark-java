@@ -1,7 +1,6 @@
 package com.github.sisyphsu.benchmark.utils;
 
 import com.github.sisyphsu.benchmark.Runner;
-import com.github.sisyphsu.benchmark.json.EggBenchmark;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.openjdk.jmh.annotations.*;
@@ -9,6 +8,7 @@ import org.openjdk.jmh.annotations.*;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -34,10 +34,11 @@ import java.util.concurrent.TimeUnit;
  * LinkedHashMap与LinkedTreeMap额外扩展了数据结构，因此存在略微的性能损耗。
  * <p>
  * 1K只读get性能测试：
- * Benchmark                                         Mode  Cnt   Score    Error   Units
- * MapBenchmark.hashBenchmark                        avgt    9   2.054 ±  0.022   ns/op
- * MapBenchmark.linkedBenchmark                      avgt    9   2.137 ±  0.562   ns/op
- * MapBenchmark.treeBenchmark                        avgt    9   2.221 ±  0.218   ns/op
+ * Benchmark                                             Mode  Cnt   Score    Error   Units
+ * MapBenchmark.concurrentBenchmark                      avgt    9   1.973 ±  0.266   ns/op
+ * MapBenchmark.hashBenchmark                            avgt    9   2.147 ±  0.231   ns/op
+ * MapBenchmark.linkedBenchmark                          avgt    9   2.055 ±  0.024   ns/op
+ * MapBenchmark.treeBenchmark                            avgt    9   2.372 ±  0.816   ns/op
  *
  * @author sulin
  * @since 2019-05-06 10:49:47
@@ -53,6 +54,7 @@ public class MapBenchmark {
     private static final Map<String, Object> HASH_MAP = new HashMap<>();
     private static final Map<String, Object> TREE_MAP = new HashMap<>();
     private static final Map<String, Object> LINKED_MAP = new LinkedHashMap<>();
+    private static final Map<String, Object> CONCURRENT_MAP = new ConcurrentHashMap<>();
     private static final String KEY = RandomStringUtils.randomAlphanumeric(16);
     private static final int INIT_SIZE = 1024;
 
@@ -62,6 +64,7 @@ public class MapBenchmark {
             HASH_MAP.put(key, key);
             TREE_MAP.put(key, key);
             LINKED_MAP.put(key, key);
+            CONCURRENT_MAP.put(key, key);
         }
     }
 
@@ -84,6 +87,13 @@ public class MapBenchmark {
 //        TREE_MAP.put(KEY, KEY);
         TREE_MAP.get(KEY);
 //        TREE_MAP.remove(KEY);
+    }
+
+    @Benchmark
+    public void concurrentBenchmark() {
+//        CONCURRENT_MAP.put(KEY, KEY);
+        CONCURRENT_MAP.get(KEY);
+//        CONCURRENT_MAP.remove(KEY);
     }
 
     public static void main(String[] args) throws Exception {
