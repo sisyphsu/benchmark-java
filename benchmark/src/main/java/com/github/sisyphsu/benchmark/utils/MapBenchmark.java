@@ -33,12 +33,24 @@ import java.util.concurrent.TimeUnit;
  * 在大部分情况下，HashMap与TreeMap的读写性能相差无几，内存占用暂未考虑，并且没有测试到平衡树调整的性能损耗。
  * LinkedHashMap与LinkedTreeMap额外扩展了数据结构，因此存在略微的性能损耗。
  * <p>
+ * 128只读get性能测试：
+ * Benchmark                                             Mode  Cnt   Score    Error   Units
+ * MapBenchmark.concurrentBenchmark                      avgt    9   2.240 ±  0.109   ns/op
+ * MapBenchmark.hashBenchmark                            avgt    9   2.243 ±  0.226   ns/op
+ * MapBenchmark.linkedBenchmark                          avgt    9   1.974 ±  0.215   ns/op
+ * MapBenchmark.treeBenchmark                            avgt    9   2.235 ±  0.226   ns/op
  * 1K只读get性能测试：
  * Benchmark                                             Mode  Cnt   Score    Error   Units
  * MapBenchmark.concurrentBenchmark                      avgt    9   1.973 ±  0.266   ns/op
  * MapBenchmark.hashBenchmark                            avgt    9   2.147 ±  0.231   ns/op
  * MapBenchmark.linkedBenchmark                          avgt    9   2.055 ±  0.024   ns/op
  * MapBenchmark.treeBenchmark                            avgt    9   2.372 ±  0.816   ns/op
+ * 10K只读get性能测试：
+ * Benchmark                                             Mode  Cnt   Score    Error   Units
+ * MapBenchmark.concurrentBenchmark                      avgt    9   1.972 ±  0.276   ns/op
+ * MapBenchmark.hashBenchmark                            avgt    9   2.148 ±  0.216   ns/op
+ * MapBenchmark.linkedBenchmark                          avgt    9   2.143 ±  0.582   ns/op
+ * MapBenchmark.treeBenchmark                            avgt    9   2.149 ±  0.212   ns/op
  *
  * @author sulin
  * @since 2019-05-06 10:49:47
@@ -56,7 +68,7 @@ public class MapBenchmark {
     private static final Map<String, Object> LINKED_MAP = new LinkedHashMap<>();
     private static final Map<String, Object> CONCURRENT_MAP = new ConcurrentHashMap<>();
     private static final String KEY = RandomStringUtils.randomAlphanumeric(16);
-    private static final int INIT_SIZE = 1024;
+    private static final int INIT_SIZE = 10240;
 
     static {
         for (int i = 0; i < INIT_SIZE; i++) {
