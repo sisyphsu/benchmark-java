@@ -53,7 +53,7 @@ public class VolatileBenchmark {
 
     @Benchmark
     public void volat() {
-//        counter2 += 2;
+        counter2 += 2;
         Object o = U.getObjectVolatile(arr2, ((long) 3 << ASHIFT) + ABASE);
     }
 
