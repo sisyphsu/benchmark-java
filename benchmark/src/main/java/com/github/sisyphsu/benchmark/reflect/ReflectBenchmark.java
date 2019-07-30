@@ -1,5 +1,6 @@
 package com.github.sisyphsu.benchmark.reflect;
 
+import com.github.sisyphsu.benchmark.Runner;
 import net.sf.cglib.reflect.FastClass;
 import net.sf.cglib.reflect.FastMethod;
 import org.openjdk.jmh.annotations.*;
@@ -26,11 +27,18 @@ import java.util.concurrent.TimeUnit;
  * ReflectBenchmark.reflectAccessor  avgt    9   26.033 ± 0.561  ns/op
  * ReflectBenchmark.reflectCglib     avgt    9   28.733 ± 1.328  ns/op
  * ReflectBenchmark.reflectMethod    avgt    9   28.446 ± 0.715  ns/op
+ * <p>
+ * Benchmark                                      Mode  Cnt     Score    Error   Units
+ * ReflectBenchmark.direct                        avgt    9    25.678 ±  0.341   ns/op
+ * ReflectBenchmark.reflectAccessor               avgt    9    25.938 ±  0.193   ns/op
+ * ReflectBenchmark.reflectCglib                  avgt    9    29.128 ±  0.251   ns/op
+ * ReflectBenchmark.reflectMethod                 avgt    9    28.295 ±  0.325   ns/op
+ * ReflectBenchmark.reflectMethodOverrided        avgt    9    27.651 ±  0.269   ns/op
  *
  * @author sulin
  * @since 2019-05-13 20:49:14
  */
-@Warmup(iterations = 1, time = 1)
+@Warmup(iterations = 2, time = 2)
 @BenchmarkMode(Mode.AverageTime)
 @Fork(3)
 @Measurement(iterations = 3, time = 3)
@@ -39,6 +47,7 @@ public class ReflectBenchmark {
 
     private static final ReflectBenchmark B = new ReflectBenchmark();
     private static final Method method;
+    private static final Method methodOverrided;
     private static final MethodAccessor accessor;
 
     private static final FastClass cglibClass;
@@ -47,6 +56,8 @@ public class ReflectBenchmark {
     static {
         try {
             method = ReflectBenchmark.class.getMethod("now");
+            methodOverrided = ReflectBenchmark.class.getMethod("now");
+            methodOverrided.setAccessible(true);
         } catch (NoSuchMethodException e) {
             throw new RuntimeException(e);
         }
@@ -71,6 +82,11 @@ public class ReflectBenchmark {
     }
 
     @Benchmark
+    public void reflectMethodOverrided() throws Exception {
+        Object ms = methodOverrided.invoke(B);
+    }
+
+    @Benchmark
     public void reflectAccessor() throws Exception {
         Object ms = accessor.invoke(B, null);
     }
@@ -90,6 +106,8 @@ public class ReflectBenchmark {
         b.reflect();
         b.reflectAccessor();
         b.reflectCglib();
+
+        Runner.run(ReflectBenchmark.class);
     }
 
 }
