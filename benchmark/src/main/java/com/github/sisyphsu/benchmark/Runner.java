@@ -2,7 +2,7 @@ package com.github.sisyphsu.benchmark;
 
 import com.github.sisyphsu.benchmark.common.MemoryProfiler;
 import org.openjdk.jmh.profile.GCProfiler;
-import org.openjdk.jmh.runner.options.Options;
+import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 /**
@@ -11,14 +11,23 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
  */
 public class Runner {
 
-    public static void run(Class cls) throws Exception {
-        Options opt = new OptionsBuilder()
-                .include(cls.getSimpleName())
-                .addProfiler(GCProfiler.class)
-                .addProfiler(MemoryProfiler.class)
-                .build();
+    private static boolean gc;
+    private static boolean memory;
 
-        new org.openjdk.jmh.runner.Runner(opt).run();
+    public static void run(Class cls) {
+        OptionsBuilder builder = new OptionsBuilder();
+        builder.include(cls.getSimpleName());
+        if (gc) {
+            builder.addProfiler(GCProfiler.class);
+        }
+        if (memory) {
+            builder.addProfiler(MemoryProfiler.class);
+        }
+        try {
+            new org.openjdk.jmh.runner.Runner(builder.build()).run();
+        } catch (RunnerException e) {
+            throw new RuntimeException(e);
+        }
     }
 
 }

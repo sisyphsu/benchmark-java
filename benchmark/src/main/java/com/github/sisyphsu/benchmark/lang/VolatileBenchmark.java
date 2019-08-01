@@ -48,13 +48,15 @@ public class VolatileBenchmark {
     @Benchmark
     public void normal() {
 //        counter1 += 1;
-        Object o = arr1[3];
+//        Object o = arr1[3];
+        long l = counter1;
     }
 
     @Benchmark
     public void volat() {
-        counter2 += 2;
-        Object o = U.getObjectVolatile(arr2, ((long) 3 << ASHIFT) + ABASE);
+//        counter2 += 2;
+//        Object o = U.getObjectVolatile(arr2, ((long) 3 << ASHIFT) + ABASE);
+        long l = counter2;
     }
 
     public static void main(String[] args) throws Exception {
