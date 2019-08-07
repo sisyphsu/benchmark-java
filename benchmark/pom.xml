@@ -81,6 +81,12 @@
         </dependency>
 
         <dependency>
+            <groupId>com.rubiconproject.oss</groupId>
+            <artifactId>jchronic</artifactId>
+            <version>0.2.8</version>
+        </dependency>
+
+        <dependency>
             <groupId>com.github.sisyphsu</groupId>
             <artifactId>import-test</artifactId>
             <version>1.0.0-SNAPSHOT</version>
