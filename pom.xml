@@ -12,6 +12,7 @@
         <module>code-vs-exception</module>
         <module>algorithm</module>
         <module>benchmark</module>
+        <module>import-test</module>
     </modules>
 
     <build>
