@@ -27,7 +27,6 @@ public final class Pattern {
     /**
      * 启用大小写不敏感的匹配模式。
      * 默认情况下，大小写不敏感匹配只针对US-ASCII字符集的字符生效，
-     * 针对Unicode字符集需要通过{@link #UNICODE_CASE}来联合设置大小写敏感策略。
      * <p>
      * 此模式也可以通过内嵌表达式`(?i)`启用，且会造成轻微的性能损耗。
      */
@@ -63,13 +62,6 @@ public final class Pattern {
      * 可以通过内嵌表达式`(?s)`启用，s等价于single-line的缩写。
      */
     public static final int DOTALL = 0x20;
-
-    /**
-     * 是否启用大小写不敏感对Unicode字符的支持，它是对CASE_INSENSITIVE的补充，支持Unicode字符的大小写不敏感
-     * <p>
-     * 此模式可以通过内嵌表达式`(?u)`启用，它会造成一些性能损失。
-     */
-    public static final int UNICODE_CASE = 0x40;
 
     private String pattern;
     private int flags;
@@ -888,7 +880,7 @@ public final class Pattern {
             }
         }
         if (has(CASE_INSENSITIVE))
-            return new CIBackRef(refNum, has(UNICODE_CASE));
+            return new CIBackRef(refNum, false);
         else
             return new BackRef(refNum);
     }
@@ -1014,7 +1006,7 @@ public final class Pattern {
                     throw error("(named capturing group <" + name + "> does not exit");
                 if (create) {
                     if (has(CASE_INSENSITIVE))
-                        root = new CIBackRef(namedGroups().get(name), has(UNICODE_CASE));
+                        root = new CIBackRef(namedGroups().get(name), false);
                     else
                         root = new BackRef(namedGroups().get(name));
                 }
@@ -1193,13 +1185,9 @@ public final class Pattern {
            (6)AngstromSign u+212b
               toLowerCase(u+212b) ==> u+00e5
         */
-        if (ch < 256 && !(has(CASE_INSENSITIVE) && has(UNICODE_CASE) &&
-                (ch == 0xff || ch == 0xb5 ||
-                        ch == 0x49 || ch == 0x69 ||  //I and i
-                        ch == 0x53 || ch == 0x73 ||  //S and s
-                        ch == 0x4b || ch == 0x6b ||  //K and k
-                        ch == 0xc5 || ch == 0xe5)))  //A+ring
+        if (ch < 256) {
             return bits.add(ch, flags);
+        }
         return newSingle(ch);
     }
 
@@ -1588,9 +1576,6 @@ public final class Pattern {
                 case 'd':
                     flags |= UNIX_LINES;
                     break;
-                case 'u':
-                    flags |= UNICODE_CASE;
-                    break;
                 case 'x':
                     flags |= COMMENTS;
                     break;
@@ -1623,9 +1608,6 @@ public final class Pattern {
                     break;
                 case 'd':
                     flags &= ~UNIX_LINES;
-                    break;
-                case 'u':
-                    flags &= ~UNICODE_CASE;
                     break;
                 case 'x':
                     flags &= ~COMMENTS;
@@ -1878,9 +1860,6 @@ public final class Pattern {
                 if (ASCII.isAscii(c)) {
                     bits[ASCII.toUpper(c)] = true;
                     bits[ASCII.toLower(c)] = true;
-                } else if ((flags & UNICODE_CASE) != 0) {
-                    bits[Character.toLowerCase(c)] = true;
-                    bits[Character.toUpperCase(c)] = true;
                 }
             }
             bits[c] = true;
@@ -1898,12 +1877,7 @@ public final class Pattern {
     private CharProperty newSingle(final int ch) {
         if (has(CASE_INSENSITIVE)) {
             int lower, upper;
-            if (has(UNICODE_CASE)) {
-                upper = Character.toUpperCase(ch);
-                lower = Character.toLowerCase(upper);
-                if (upper != lower)
-                    return new SingleU(lower);
-            } else if (ASCII.isAscii(ch)) {
+            if (ASCII.isAscii(ch)) {
                 lower = ASCII.toLower(ch);
                 upper = ASCII.toUpper(ch);
                 if (lower != upper)
@@ -1921,12 +1895,6 @@ public final class Pattern {
     private Node newSlice(int[] buf, int count, boolean hasSupplementary) {
         int[] tmp = new int[count];
         if (has(CASE_INSENSITIVE)) {
-            if (has(UNICODE_CASE)) {
-                for (int i = 0; i < count; i++) {
-                    tmp[i] = Character.toLowerCase(Character.toUpperCase(buf[i]));
-                }
-                return hasSupplementary ? new SliceUS(tmp) : new SliceU(tmp);
-            }
             for (int i = 0; i < count; i++) {
                 tmp[i] = ASCII.toLower(buf[i]);
             }
@@ -2412,21 +2380,6 @@ public final class Pattern {
     }
 
     /**
-     * Unicode case insensitive matches a given Unicode character
-     */
-    static final class SingleU extends CharProperty {
-        final int lower;
-
-        SingleU(int lower) {
-            this.lower = lower;
-        }
-
-        boolean isSatisfiedBy(int ch) {
-            return lower == ch || lower == Character.toLowerCase(Character.toUpperCase(ch));
-        }
-    }
-
-    /**
      * Node class that matches a Unicode block.
      */
     static final class Block extends CharProperty {
@@ -2589,31 +2542,6 @@ public final class Pattern {
     }
 
     /**
-     * Node class for a unicode_case_insensitive/BMP-only sequence of
-     * literal characters. Uses unicode case folding.
-     */
-    static final class SliceU extends SliceNode {
-        SliceU(int[] buf) {
-            super(buf);
-        }
-
-        boolean match(Matcher matcher, int i, CharSequence seq) {
-            int[] buf = buffer;
-            int len = buf.length;
-            for (int j = 0; j < len; j++) {
-                if ((i + j) >= matcher.to) {
-                    matcher.hitEnd = true;
-                    return false;
-                }
-                int c = seq.charAt(i + j);
-                if (buf[j] != c && buf[j] != Character.toLowerCase(Character.toUpperCase(c)))
-                    return false;
-            }
-            return next.match(matcher, i + len, seq);
-        }
-    }
-
-    /**
      * Node class for a case sensitive sequence of literal characters
      * including supplementary characters.
      */
@@ -2677,20 +2605,6 @@ public final class Pattern {
         }
     }
 
-    /**
-     * Node class for a case insensitive sequence of literal characters.
-     * Uses unicode case folding.
-     */
-    static final class SliceUS extends SliceIS {
-        SliceUS(int[] buf) {
-            super(buf);
-        }
-
-        int toLower(int c) {
-            return Character.toLowerCase(Character.toUpperCase(c));
-        }
-    }
-
     private static boolean inRange(int lower, int ch, int upper) {
         return lower <= ch && ch <= upper;
     }
@@ -2711,15 +2625,6 @@ public final class Pattern {
      * range in a case insensitive manner.
      */
     private CharProperty caseInsensitiveRangeFor(final int lower, final int upper) {
-        if (has(UNICODE_CASE))
-            return new CharProperty() {
-                boolean isSatisfiedBy(int ch) {
-                    if (inRange(lower, ch, upper))
-                        return true;
-                    int up = Character.toUpperCase(ch);
-                    return inRange(lower, up, upper) || inRange(lower, Character.toLowerCase(up), upper);
-                }
-            };
         return new CharProperty() {
             boolean isSatisfiedBy(int ch) {
                 return inRange(lower, ch, upper) || ASCII.isAscii(ch)
