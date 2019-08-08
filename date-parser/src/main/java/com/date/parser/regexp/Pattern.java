@@ -40,14 +40,6 @@ public final class Pattern {
     public static final int COMMENTS = 0x04;
 
     /**
-     * 启用多行模式，此模式下[^]只会匹配到换行符之后的数据，而[$]只会匹配到换行符或EOF之前的数据。
-     * 而默认情况下, 即未启用多行模式时，这些表达式不会针对换行符做特殊处理。
-     * <p>
-     * 此模式可以通过内嵌表达式`(?m)`启用
-     */
-    public static final int MULTILINE = 0x08;
-
-    /**
      * 启用Pattern的字面解析模式，此模式下则整个输入字符串会被视为连续的普通字符串，元字符或逃逸字符等都不会有特殊含义。
      * <p>
      * 启用后，CASE_INSENSITIVE与UNICODE_CASE仍然会对匹配产生影响，其他模式都会被覆盖。
@@ -682,21 +674,14 @@ public final class Pattern {
                     break;
                 case '^':
                     next();
-                    if (has(MULTILINE)) {
-                        if (has(UNIX_LINES))
-                            node = new UnixCaret();
-                        else
-                            node = new Caret();
-                    } else {
-                        node = new Begin();
-                    }
+                    node = new Begin();
                     break;
                 case '$':
                     next();
                     if (has(UNIX_LINES))
-                        node = new UnixDollar(has(MULTILINE));
+                        node = new UnixDollar(false);
                     else
-                        node = new Dollar(has(MULTILINE));
+                        node = new Dollar(false);
                     break;
                 case '.':
                     next();
@@ -1567,9 +1552,6 @@ public final class Pattern {
                 case 'i':
                     flags |= CASE_INSENSITIVE;
                     break;
-                case 'm':
-                    flags |= MULTILINE;
-                    break;
                 case 's':
                     flags |= DOTALL;
                     break;
@@ -1599,9 +1581,6 @@ public final class Pattern {
             switch (ch) {
                 case 'i':
                     flags &= ~CASE_INSENSITIVE;
-                    break;
-                case 'm':
-                    flags &= ~MULTILINE;
                     break;
                 case 's':
                     flags &= ~DOTALL;
@@ -2070,62 +2049,6 @@ public final class Pattern {
                 return next.match(matcher, i, seq);
             }
             return false;
-        }
-    }
-
-    /**
-     * Node to anchor at the beginning of a line. This is essentially the
-     * object to match for the multiline ^.
-     */
-    static final class Caret extends Node {
-        boolean match(Matcher matcher, int i, CharSequence seq) {
-            int startIndex = matcher.from;
-            int endIndex = matcher.to;
-            if (!matcher.anchoringBounds) {
-                startIndex = 0;
-                endIndex = matcher.getTextLength();
-            }
-            // Perl does not match ^ at end of input even after newline
-            if (i == endIndex) {
-                matcher.hitEnd = true;
-                return false;
-            }
-            if (i > startIndex) {
-                char ch = seq.charAt(i - 1);
-                if (ch != '\n' && ch != '\r' && (ch | 1) != '\u2029' && ch != '\u0085') {
-                    return false;
-                }
-                // Should treat /r/n as one newline
-                if (ch == '\r' && seq.charAt(i) == '\n')
-                    return false;
-            }
-            return next.match(matcher, i, seq);
-        }
-    }
-
-    /**
-     * Node to anchor at the beginning of a line when in unixdot mode.
-     */
-    static final class UnixCaret extends Node {
-        boolean match(Matcher matcher, int i, CharSequence seq) {
-            int startIndex = matcher.from;
-            int endIndex = matcher.to;
-            if (!matcher.anchoringBounds) {
-                startIndex = 0;
-                endIndex = matcher.getTextLength();
-            }
-            // Perl does not match ^ at end of input even after newline
-            if (i == endIndex) {
-                matcher.hitEnd = true;
-                return false;
-            }
-            if (i > startIndex) {
-                char ch = seq.charAt(i - 1);
-                if (ch != '\n') {
-                    return false;
-                }
-            }
-            return next.match(matcher, i, seq);
         }
     }
 
