@@ -7,25 +7,6 @@ import java.util.Map;
 
 public final class Pattern {
 
-    /*
-     * Regular expression modifier values.  Instead of being passed as
-     * arguments, they can also be passed as inline modifiers.
-     * For example, the following statements have the same effect.
-     * <pre>
-     * RegExp r1 = RegExp.compile("abc", Pattern.I|Pattern.M);
-     * RegExp r2 = RegExp.compile("(?im)abc", 0);
-     * </pre>
-     *
-     * The flags are duplicated so that the familiar Perl match flag names are available.
-     */
-
-    /**
-     * 启用dotall模式，此模式下，表达式`.`会匹配任何字符包括换行符，而默认情况下它不会匹配到换行符。
-     * <p>
-     * 可以通过内嵌表达式`(?s)`启用，s等价于single-line的缩写。
-     */
-    public static final int DOTALL = 0x20;
-
     private String pattern;
     private int flags;
     /**
@@ -566,11 +547,7 @@ public final class Pattern {
                     break;
                 case '.':
                     next();
-                    if (has(DOTALL)) {
-                        node = new All();
-                    } else {
-                        node = new Dot();
-                    }
+                    node = new Dot();
                     break;
                 case '|':
                 case ')':
@@ -1413,33 +1390,10 @@ public final class Pattern {
     private void addFlag() {
         int ch = peek();
         for (; ; ) {
-            switch (ch) {
-                case 's':
-                    flags |= DOTALL;
-                    break;
-                case '-': // subFlag then fall through
-                    next();
-                    subFlag();
-                default:
-                    return;
+            if (ch == '-') { // subFlag then fall through
+                next();
             }
-            ch = next();
-        }
-    }
-
-    /**
-     * Parses the second part of inlined match flags and turns off
-     * flags appropriately.
-     */
-    private void subFlag() {
-        int ch = peek();
-        for (; ; ) {
-            if (ch == 's') {
-                flags &= ~DOTALL;
-            } else {
-                return;
-            }
-            ch = next();
+            break;
         }
     }
 
@@ -1947,49 +1901,6 @@ public final class Pattern {
                 }
             }
             // Matched at current end so hit end
-            matcher.hitEnd = true;
-            // If a $ matches because of end of input, then more input
-            // could cause it to fail!
-            matcher.requireEnd = true;
-            return next.match(matcher, i, seq);
-        }
-
-        boolean study(TreeInfo info) {
-            next.study(info);
-            return info.deterministic;
-        }
-    }
-
-    /**
-     * Node to anchor at the end of a line or the end of input based on the
-     * multiline mode when in unix lines mode.
-     */
-    static final class UnixDollar extends Node {
-        boolean multiline;
-
-        UnixDollar(boolean mul) {
-            multiline = mul;
-        }
-
-        boolean match(Matcher matcher, int i, CharSequence seq) {
-            int endIndex = (matcher.anchoringBounds) ? matcher.to : matcher.getTextLength();
-            if (i < endIndex) {
-                char ch = seq.charAt(i);
-                if (ch == '\n') {
-                    // If not multiline, then only possible to
-                    // match at very end or one before end
-                    if (!multiline && i != endIndex - 1)
-                        return false;
-                    // If multiline return next.match without setting
-                    // matcher.hitEnd
-                    if (multiline)
-                        return next.match(matcher, i, seq);
-                } else {
-                    return false;
-                }
-            }
-            // Matching because at the end or 1 before the end;
-            // more input could change this so set hitEnd
             matcher.hitEnd = true;
             // If a $ matches because of end of input, then more input
             // could cause it to fail!
