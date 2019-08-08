@@ -74,75 +74,57 @@ public final class Pattern {
 
     private String pattern;
     private int flags;
-
     /**
-     * Boolean indicating this Pattern is compiled; this is necessary in order
-     * to lazily compile deserialized Patterns.
-     */
-    private transient volatile boolean compiled = false;
-
-    /**
-     * The normalized pattern string.
+     * 规范化的模板字符串，用于支持特殊的模式，一般情况下与pattern相同
      */
     private transient String normalizedPattern;
-
     /**
-     * The starting point of state machine for the find operation.  This allows
-     * a match to start anywhere in the input.
+     * 标明当前模板是否已编译，用于懒加载的case
+     */
+    private transient volatile boolean compiled = false;
+    /**
+     * 匹配操作状态机的起点
      */
     transient Node root;
-
     /**
-     * The root of object tree for a match operation.  The pattern is matched
-     * at the beginning.  This may include a find that uses BnM or a First
-     * node.
+     * The root of object tree for a match operation.
+     * The pattern is matched at the beginning.
+     * This may include a find that uses BnM or a First node.
      */
     transient Node matchRoot;
-
     /**
-     * Temporary storage used by parsing pattern slice.
+     * 解析Pattern片段时使用的临时存储
      */
     transient int[] buffer;
-
     /**
-     * Map the "name" of the "named capturing group" to its group id
-     * node.
+     * 映射groupName与它的位置，用于组的捕捉
      */
     transient volatile Map<String, Integer> namedGroups;
-
     /**
-     * Temporary storage used while parsing group references.
+     * 解析Group时的临时存储
      */
     transient GroupHead[] groupNodes;
-
     /**
      * Temporary null terminated code point array used by pattern compiling.
      */
     private transient int[] temp;
-
     /**
      * The number of capturing groups in this Pattern. Used by matchers to
      * allocate storage needed to perform a match.
      */
     transient int capturingGroupCount;
-
     /**
-     * The local variable count used by parsing tree. Used by matchers to
-     * allocate storage needed to perform a match.
+     * The local variable count used by parsing tree. Used by matchers to allocate storage needed to perform a match.
      */
     transient int localCount;
-
     /**
-     * Index into the pattern string that keeps track of how much has been
-     * parsed.
+     * Index into the pattern string that keeps track of how much has been parsed.
      */
     private transient int cursor;
-
     /**
      * Holds the length of the pattern string.
      */
     private transient int patternLength;
-
     /**
      * If the Start node might possibly match supplementary characters.
      * It is set to true during compiling if
@@ -152,7 +134,7 @@ public final class Pattern {
     private transient boolean hasSupplementary;
 
     /**
-     * Compiles the given regular expression into a pattern.
+     * 采用默认的模式编译给定的正则表达式，并生成Pattern实例。
      *
      * @param regex The expression to be compiled
      * @return the given regular expression compiled into a pattern
@@ -163,8 +145,7 @@ public final class Pattern {
     }
 
     /**
-     * Compiles the given regular expression into a pattern with the given
-     * flags.
+     * Compiles the given regular expression into a pattern with the given flags.
      *
      * @param regex The expression to be compiled
      * @param flags Match flags, a bit mask that may include
@@ -173,37 +154,19 @@ public final class Pattern {
      *              {@link #LITERAL}, {@link #UNICODE_CHARACTER_CLASS}
      *              and {@link #COMMENTS}
      * @return the given regular expression compiled into a pattern with the given flags
-     * @throws IllegalArgumentException If bit values other than those corresponding to the defined
-     *                                  match flags are set in <tt>flags</tt>
+     * @throws IllegalArgumentException If bit values other than those corresponding to the defined match flags are set in <tt>flags</tt>
      * @throws PatternSyntaxException   If the expression's syntax is invalid
      */
     public static Pattern compile(String regex, int flags) {
         return new Pattern(regex, flags);
     }
 
-    /**
-     * Returns the regular expression from which this pattern was compiled.
-     *
-     * @return The source of this pattern
-     */
-    public String pattern() {
-        return pattern;
-    }
-
-    /**
-     * <p>Returns the string representation of this pattern. This
-     * is the regular expression from which this pattern was
-     * compiled.</p>
-     *
-     * @return The string representation of this pattern
-     * @since 1.5
-     */
     public String toString() {
         return pattern;
     }
 
     /**
-     * Creates a matcher that will match the given input against this pattern.
+     * 根据给定的字符串创建Matcher
      *
      * @param input The character sequence to be matched
      * @return A new matcher for this pattern
@@ -219,30 +182,7 @@ public final class Pattern {
     }
 
     /**
-     * Returns this pattern's match flags.
-     *
-     * @return The match flags specified when this pattern was compiled
-     */
-    public int flags() {
-        return flags;
-    }
-
-    /**
-     * Compiles the given regular expression and attempts to match the given
-     * input against it.
-     *
-     * <p> An invocation of this convenience method of the form
-     *
-     * <blockquote><pre>
-     * Pattern.matches(regex, input);</pre></blockquote>
-     * <p>
-     * behaves in exactly the same way as the expression
-     *
-     * <blockquote><pre>
-     * Pattern.compile(regex).matcher(input).matches()</pre></blockquote>
-     *
-     * <p> If a pattern is to be used multiple times, compiling it once and reusing
-     * it will be more efficient than invoking this method each time.  </p>
+     * 编译给定的正则表达式并针对指定输入字符串进行正则匹配，返回匹配结果。
      *
      * @param regex The expression to be compiled
      * @param input The character sequence to be matched
@@ -256,173 +196,7 @@ public final class Pattern {
     }
 
     /**
-     * Splits the given input sequence around matches of this pattern.
-     *
-     * <p> The array returned by this method contains each substring of the
-     * input sequence that is terminated by another subsequence that matches
-     * this pattern or is terminated by the end of the input sequence.  The
-     * substrings in the array are in the order in which they occur in the
-     * input. If this pattern does not match any subsequence of the input then
-     * the resulting array has just one element, namely the input sequence in
-     * string form.
-     *
-     * <p> When there is a positive-width match at the beginning of the input
-     * sequence then an empty leading substring is included at the beginning
-     * of the resulting array. A zero-width match at the beginning however
-     * never produces such empty leading substring.
-     *
-     * <p> The <tt>limit</tt> parameter controls the number of times the
-     * pattern is applied and therefore affects the length of the resulting
-     * array.  If the limit <i>n</i> is greater than zero then the pattern
-     * will be applied at most <i>n</i>&nbsp;-&nbsp;1 times, the array's
-     * length will be no greater than <i>n</i>, and the array's last entry
-     * will contain all input beyond the last matched delimiter.  If <i>n</i>
-     * is non-positive then the pattern will be applied as many times as
-     * possible and the array can have any length.  If <i>n</i> is zero then
-     * the pattern will be applied as many times as possible, the array can
-     * have any length, and trailing empty strings will be discarded.
-     *
-     * <p> The input <tt>"boo:and:foo"</tt>, for example, yields the following
-     * results with these parameters:
-     *
-     * <blockquote><table cellpadding=1 cellspacing=0
-     * summary="Split examples showing regex, limit, and result">
-     * <tr><th align="left"><i>Regex&nbsp;&nbsp;&nbsp;&nbsp;</i></th>
-     * <th align="left"><i>Limit&nbsp;&nbsp;&nbsp;&nbsp;</i></th>
-     * <th align="left"><i>Result&nbsp;&nbsp;&nbsp;&nbsp;</i></th></tr>
-     * <tr><td align=center>:</td>
-     * <td align=center>2</td>
-     * <td><tt>{ "boo", "and:foo" }</tt></td></tr>
-     * <tr><td align=center>:</td>
-     * <td align=center>5</td>
-     * <td><tt>{ "boo", "and", "foo" }</tt></td></tr>
-     * <tr><td align=center>:</td>
-     * <td align=center>-2</td>
-     * <td><tt>{ "boo", "and", "foo" }</tt></td></tr>
-     * <tr><td align=center>o</td>
-     * <td align=center>5</td>
-     * <td><tt>{ "b", "", ":and:f", "", "" }</tt></td></tr>
-     * <tr><td align=center>o</td>
-     * <td align=center>-2</td>
-     * <td><tt>{ "b", "", ":and:f", "", "" }</tt></td></tr>
-     * <tr><td align=center>o</td>
-     * <td align=center>0</td>
-     * <td><tt>{ "b", "", ":and:f" }</tt></td></tr>
-     * </table></blockquote>
-     *
-     * @param input The character sequence to be split
-     * @param limit The result threshold, as described above
-     * @return The array of strings computed by splitting the input
-     * around matches of this pattern
-     */
-    public String[] split(CharSequence input, int limit) {
-        int index = 0;
-        boolean matchLimited = limit > 0;
-        ArrayList<String> matchList = new ArrayList<>();
-        Matcher m = matcher(input);
-
-        // Add segments before each match found
-        while (m.find()) {
-            if (!matchLimited || matchList.size() < limit - 1) {
-                if (index == 0 && index == m.start() && m.start() == m.end()) {
-                    // no empty leading substring included for zero-width match
-                    // at the beginning of the input char sequence.
-                    continue;
-                }
-                String match = input.subSequence(index, m.start()).toString();
-                matchList.add(match);
-                index = m.end();
-            } else if (matchList.size() == limit - 1) { // last one
-                String match = input.subSequence(index,
-                        input.length()).toString();
-                matchList.add(match);
-                index = m.end();
-            }
-        }
-
-        // If no match was found, return this
-        if (index == 0)
-            return new String[]{input.toString()};
-
-        // Add remaining segment
-        if (!matchLimited || matchList.size() < limit)
-            matchList.add(input.subSequence(index, input.length()).toString());
-
-        // Construct result
-        int resultSize = matchList.size();
-        if (limit == 0)
-            while (resultSize > 0 && matchList.get(resultSize - 1).equals(""))
-                resultSize--;
-        String[] result = new String[resultSize];
-        return matchList.subList(0, resultSize).toArray(result);
-    }
-
-    /**
-     * Splits the given input sequence around matches of this pattern.
-     *
-     * <p> This method works as if by invoking the two-argument {@link
-     * #split(CharSequence, int) split} method with the given input
-     * sequence and a limit argument of zero.  Trailing empty strings are
-     * therefore not included in the resulting array. </p>
-     *
-     * <p> The input <tt>"boo:and:foo"</tt>, for example, yields the following
-     * results with these expressions:
-     *
-     * <blockquote><table cellpadding=1 cellspacing=0
-     * summary="Split examples showing regex and result">
-     * <tr><th align="left"><i>Regex&nbsp;&nbsp;&nbsp;&nbsp;</i></th>
-     * <th align="left"><i>Result</i></th></tr>
-     * <tr><td align=center>:</td>
-     * <td><tt>{ "boo", "and", "foo" }</tt></td></tr>
-     * <tr><td align=center>o</td>
-     * <td><tt>{ "b", "", ":and:f" }</tt></td></tr>
-     * </table></blockquote>
-     *
-     * @param input The character sequence to be split
-     * @return The array of strings computed by splitting the input
-     * around matches of this pattern
-     */
-    public String[] split(CharSequence input) {
-        return split(input, 0);
-    }
-
-    /**
-     * Returns a literal pattern <code>String</code> for the specified
-     * <code>String</code>.
-     *
-     * <p>This method produces a <code>String</code> that can be used to
-     * create a <code>Pattern</code> that would match the string
-     * <code>s</code> as if it were a literal pattern.</p> Metacharacters
-     * or escape sequences in the input sequence will be given no special
-     * meaning.
-     *
-     * @param s The string to be literalized
-     * @return A literal string replacement
-     * @since 1.5
-     */
-    public static String quote(String s) {
-        int slashEIndex = s.indexOf("\\E");
-        if (slashEIndex == -1)
-            return "\\Q" + s + "\\E";
-
-        StringBuilder sb = new StringBuilder(s.length() * 2);
-        sb.append("\\Q");
-        int current = 0;
-        while ((slashEIndex = s.indexOf("\\E", current)) != -1) {
-            sb.append(s, current, slashEIndex);
-            current = slashEIndex + 2;
-            sb.append("\\E\\\\E\\Q");
-        }
-        sb.append(s.substring(current));
-        sb.append("\\E");
-        return sb.toString();
-    }
-
-    /**
-     * This private constructor is used to create all Patterns. The pattern
-     * string and match flags are all that is needed to completely describe
-     * a Pattern. An empty pattern string results in an object tree with
-     * only a Start node and a LastNode node.
+     * 用于创建Pattern的私有构造方法。
      */
     private Pattern(String p, int f) {
         pattern = p;
@@ -441,111 +215,10 @@ public final class Pattern {
     }
 
     /**
-     * The pattern is converted to normalizedD form and then a pure group
-     * is constructed to match canonical equivalences of the characters.
-     */
-    private void normalize() {
-        int lastCodePoint = -1;
-
-        // Convert pattern into normalizedD form
-        normalizedPattern = Normalizer.normalize(pattern, Normalizer.Form.NFD);
-        patternLength = normalizedPattern.length();
-
-        // Modify pattern to match canonical equivalences
-        StringBuilder newPattern = new StringBuilder(patternLength);
-        for (int i = 0; i < patternLength; ) {
-            int c = normalizedPattern.codePointAt(i);
-            StringBuilder sequenceBuffer;
-            if ((Character.getType(c) == Character.NON_SPACING_MARK)
-                    && (lastCodePoint != -1)) {
-                sequenceBuffer = new StringBuilder();
-                sequenceBuffer.appendCodePoint(lastCodePoint);
-                sequenceBuffer.appendCodePoint(c);
-                while (Character.getType(c) == Character.NON_SPACING_MARK) {
-                    i += Character.charCount(c);
-                    if (i >= patternLength)
-                        break;
-                    c = normalizedPattern.codePointAt(i);
-                    sequenceBuffer.appendCodePoint(c);
-                }
-                String ea = produceEquivalentAlternation(
-                        sequenceBuffer.toString());
-                newPattern.setLength(newPattern.length() - Character.charCount(lastCodePoint));
-                newPattern.append("(?:").append(ea).append(")");
-            } else if (c == '[' && lastCodePoint != '\\') {
-                i = normalizeCharClass(newPattern, i);
-            } else {
-                newPattern.appendCodePoint(c);
-            }
-            lastCodePoint = c;
-            i += Character.charCount(c);
-        }
-        normalizedPattern = newPattern.toString();
-    }
-
-    /**
-     * Complete the character class being parsed and add a set
-     * of alternations to it that will match the canonical equivalences
-     * of the characters within the class.
-     */
-    private int normalizeCharClass(StringBuilder newPattern, int i) {
-        StringBuilder charClass = new StringBuilder();
-        StringBuilder eq = null;
-        int lastCodePoint = -1;
-        String result;
-
-        i++;
-        if (i == normalizedPattern.length())
-            throw error("Unclosed character class");
-        charClass.append("[");
-        while (true) {
-            int c = normalizedPattern.codePointAt(i);
-            StringBuilder sequenceBuffer;
-
-            if (c == ']' && lastCodePoint != '\\') {
-                charClass.append((char) c);
-                break;
-            } else if (Character.getType(c) == Character.NON_SPACING_MARK) {
-                sequenceBuffer = new StringBuilder();
-                sequenceBuffer.appendCodePoint(lastCodePoint);
-                while (Character.getType(c) == Character.NON_SPACING_MARK) {
-                    sequenceBuffer.appendCodePoint(c);
-                    i += Character.charCount(c);
-                    if (i >= normalizedPattern.length())
-                        break;
-                    c = normalizedPattern.codePointAt(i);
-                }
-                String ea = produceEquivalentAlternation(
-                        sequenceBuffer.toString());
-
-                charClass.setLength(charClass.length() - Character.charCount(lastCodePoint));
-                if (eq == null)
-                    eq = new StringBuilder();
-                eq.append('|');
-                eq.append(ea);
-            } else {
-                charClass.appendCodePoint(c);
-                i++;
-            }
-            if (i == normalizedPattern.length())
-                throw error("Unclosed character class");
-            lastCodePoint = c;
-        }
-
-        if (eq != null) {
-            result = "(?:" + charClass.toString() + eq.toString() + ")";
-        } else {
-            result = charClass.toString();
-        }
-
-        newPattern.append(result);
-        return i;
-    }
-
-    /**
-     * Given a specific sequence composed of a regular character and
-     * combining marks that follow it, produce the alternation that will
-     * match all canonical equivalences of that sequence.
+     * Given a specific sequence composed of a regular character and combining marks that follow it,
+     * produce the alternation that will match all canonical equivalences of that sequence.
+     * <p>
+     * 给定由常规字符组成的特定序列并在其后面组合标记，产生将匹配该序列的所有规范等价的交替。
      */
     private String produceEquivalentAlternation(String source) {
         int len = countChars(source, 0, 1);
@@ -572,13 +245,10 @@ public final class Pattern {
     }
 
     /**
-     * Returns an array of strings that have all the possible
-     * permutations of the characters in the input string.
-     * This is used to get a list of all possible orderings
-     * of a set of combining marks. Note that some of the permutations
-     * are invalid because of combining class collisions, and these
-     * possibilities must be removed because they are not canonically
-     * equivalent.
+     * Returns an array of strings that have all the possible permutations of the characters in the input string.
+     * This is used to get a list of all possible orderings of a set of combining marks.
+     * Note that some of the permutations are invalid because of combining class collisions,
+     * and these possibilities must be removed because they are not canonically equivalent.
      */
     private String[] producePermutations(String input) {
         if (input.length() == countChars(input, 0, 1))
@@ -613,8 +283,7 @@ public final class Pattern {
             i += Character.charCount(c);
         }
 
-        // For each char, take it out and add the permutations
-        // of the remaining chars
+        // For each char, take it out and add the permutations of the remaining chars
         int index = 0;
         int len;
         // offset maintains the index in code units.
@@ -739,12 +408,7 @@ public final class Pattern {
      * of the expression which will create the object tree.
      */
     private void compile() {
-        // Handle canonical equivalences
-        if (false && !has(LITERAL)) {
-            normalize();
-        } else {
-            normalizedPattern = pattern;
-        }
+        normalizedPattern = pattern;
         patternLength = normalizedPattern.length();
 
         // Copy pattern to int array for convenience
@@ -818,7 +482,7 @@ public final class Pattern {
     /**
      * Used to print out a subtree of the Pattern to help with debugging.
      */
-    private static void printObjectTree(Node node) {
+    public static void printObjectTree(Node node) {
         while (node != null) {
             if (node instanceof Prolog) {
                 System.out.println(node);
@@ -1684,7 +1348,7 @@ public final class Pattern {
                         ch == 0x53 || ch == 0x73 ||  //S and s
                         ch == 0x4b || ch == 0x6b ||  //K and k
                         ch == 0xc5 || ch == 0xe5)))  //A+ring
-            return bits.add(ch, flags());
+            return bits.add(ch, flags);
         return newSingle(ch);
     }
 
