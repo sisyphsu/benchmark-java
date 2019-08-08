@@ -1,6 +1,5 @@
 package com.date.parser.regexp;
 
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -14,17 +13,11 @@ public final class Pattern {
      */
     private transient String normalizedPattern;
     /**
-     * 标明当前模板是否已编译，用于懒加载的case
-     */
-    private transient volatile boolean compiled = false;
-    /**
      * 匹配操作状态机的起点
      */
     transient Node root;
     /**
-     * The root of object tree for a match operation.
-     * The pattern is matched at the beginning.
-     * This may include a find that uses BnM or a First node.
+     * 匹配操作的对象树根节点，即正则匹配的起点，This may include a find that uses BnM or a First node.
      */
     transient Node matchRoot;
     /**
@@ -70,42 +63,20 @@ public final class Pattern {
 
     /**
      * 采用默认的模式编译给定的正则表达式，并生成Pattern实例。
-     *
-     * @param regex The expression to be compiled
-     * @return the given regular expression compiled into a pattern
-     * @throws PatternSyntaxException If the expression's syntax is invalid
      */
     public static Pattern compile(String regex) {
         return new Pattern(regex, 0);
     }
 
-    public String toString() {
-        return pattern;
-    }
-
     /**
      * 根据给定的字符串创建Matcher
-     *
-     * @param input The character sequence to be matched
-     * @return A new matcher for this pattern
      */
     public Matcher matcher(CharSequence input) {
-        if (!compiled) {
-            synchronized (this) {
-                if (!compiled)
-                    compile();
-            }
-        }
         return new Matcher(this, input);
     }
 
     /**
      * 编译给定的正则表达式并针对指定输入字符串进行正则匹配，返回匹配结果。
-     *
-     * @param regex The expression to be compiled
-     * @param input The character sequence to be matched
-     * @return whether or not the regular expression matches on the input
-     * @throws PatternSyntaxException If the expression's syntax is invalid
      */
     public static boolean matches(String regex, CharSequence input) {
         Pattern p = Pattern.compile(regex);
@@ -133,77 +104,6 @@ public final class Pattern {
     }
 
     /**
-     * Preprocess any \Q...\E sequences in `temp', meta-quoting them.
-     * See the description of `quotemeta' in perlfunc(1).
-     */
-    private void RemoveQEQuoting() {
-        final int pLen = patternLength;
-        int i = 0;
-        while (i < pLen - 1) {
-            if (temp[i] != '\\')
-                i += 1;
-            else if (temp[i + 1] != 'Q')
-                i += 2;
-            else
-                break;
-        }
-        if (i >= pLen - 1)    // No \Q sequence found
-            return;
-        int j = i;
-        i += 2;
-        int[] newtemp = new int[j + 3 * (pLen - i) + 2];
-        System.arraycopy(temp, 0, newtemp, 0, j);
-
-        boolean inQuote = true;
-        boolean beginQuote = true;
-        while (i < pLen) {
-            int c = temp[i++];
-            if (!ASCII.isAscii(c) || ASCII.isAlpha(c)) {
-                newtemp[j++] = c;
-            } else if (ASCII.isDigit(c)) {
-                if (beginQuote) {
-                    /*
-                     * A unicode escape \[0xu] could be before this quote,
-                     * and we don't want this numeric char to processed as
-                     * part of the escape.
-                     */
-                    newtemp[j++] = '\\';
-                    newtemp[j++] = 'x';
-                    newtemp[j++] = '3';
-                }
-                newtemp[j++] = c;
-            } else if (c != '\\') {
-                if (inQuote) newtemp[j++] = '\\';
-                newtemp[j++] = c;
-            } else if (inQuote) {
-                if (temp[i] == 'E') {
-                    i++;
-                    inQuote = false;
-                } else {
-                    newtemp[j++] = '\\';
-                    newtemp[j++] = '\\';
-                }
-            } else {
-                if (temp[i] == 'Q') {
-                    i++;
-                    inQuote = true;
-                    beginQuote = true;
-                    continue;
-                } else {
-                    newtemp[j++] = c;
-                    if (i != pLen)
-                        newtemp[j++] = temp[i++];
-                }
-            }
-
-            beginQuote = false;
-        }
-
-        patternLength = j;
-        temp = Arrays.copyOf(newtemp, j + 2); // double zero termination
-    }
-
-    /**
      * Copies regular expression to an int array and invokes the parsing
      * of the expression which will create the object tree.
      */
@@ -227,8 +127,6 @@ public final class Pattern {
         }
 
         patternLength = count;   // patternLength now in code points
-
-        RemoveQEQuoting();
 
         // Allocate all temporary objects here.
         buffer = new int[32];
@@ -263,7 +161,6 @@ public final class Pattern {
         buffer = null;
         groupNodes = null;
         patternLength = 0;
-        compiled = true;
     }
 
     Map<String, Integer> namedGroups() {
@@ -331,18 +228,7 @@ public final class Pattern {
         }
     }
 
-    /*
-     * The following private methods are mainly used to improve the
-     * readability of the code. In order to let the Java compiler easily
-     * inline them, we should not put many assertions or error checks in them.
-     */
-
-    /**
-     * Indicates whether a particular flag is set or not.
-     */
-    private boolean has(int f) {
-        return (flags & f) != 0;
-    }
+    // 以下私有方法主要用于提高代码可读性，为了让Java编译器容易地inline这些函数，它们不应该有太多的判断或错误检查等。
 
     /**
      * Match next character, signal error if failed.
@@ -757,20 +643,8 @@ public final class Pattern {
                 if (create) root = new Bound(Bound.NONE, false);
                 return -1;
             case 'C':
-                break;
-            case 'D':
-                if (create) root = new Ctype(ASCII.DIGIT).complement();
-                return -1;
             case 'E':
             case 'F':
-                break;
-            case 'G':
-                if (inclass) break;
-                if (create) root = new LastMatch();
-                return -1;
-            case 'H':
-                if (create) root = new HorizWS().complement();
-                return -1;
             case 'I':
             case 'J':
             case 'K':
@@ -780,7 +654,30 @@ public final class Pattern {
             case 'O':
             case 'P':
             case 'Q':
+            case 'T':
+            case 'U':
+            case 'X':
+            case 'Y':
+            case 'g':
+            case 'i':
+            case 'j':
+            case 'l':
+            case 'm':
+            case 'o':
+            case 'p':
+            case 'q':
+            case 'y':
                 break;
+            case 'D':
+                if (create) root = new Ctype(ASCII.DIGIT).complement();
+                return -1;
+            case 'G':
+                if (inclass) break;
+                if (create) root = new LastMatch();
+                return -1;
+            case 'H':
+                if (create) root = new HorizWS().complement();
+                return -1;
             case 'R':
                 if (inclass) break;
                 if (create) root = new LineEnding();
@@ -788,18 +685,12 @@ public final class Pattern {
             case 'S':
                 if (create) root = new Ctype(ASCII.SPACE).complement();
                 return -1;
-            case 'T':
-            case 'U':
-                break;
             case 'V':
                 if (create) root = new VertWS().complement();
                 return -1;
             case 'W':
                 if (create) root = new Ctype(ASCII.WORD).complement();
                 return -1;
-            case 'X':
-            case 'Y':
-                break;
             case 'Z':
                 if (inclass) break;
                 if (create) {
@@ -821,14 +712,9 @@ public final class Pattern {
                 return '\033';
             case 'f':
                 return '\f';
-            case 'g':
-                break;
             case 'h':
                 if (create) root = new HorizWS();
                 return -1;
-            case 'i':
-            case 'j':
-                break;
             case 'k':
                 if (inclass)
                     break;
@@ -841,15 +727,8 @@ public final class Pattern {
                     root = new BackRef(namedGroups().get(name));
                 }
                 return -1;
-            case 'l':
-            case 'm':
-                break;
             case 'n':
                 return '\n';
-            case 'o':
-            case 'p':
-            case 'q':
-                break;
             case 'r':
                 return '\r';
             case 's':
@@ -877,8 +756,6 @@ public final class Pattern {
                 return -1;
             case 'x':
                 return x();
-            case 'y':
-                break;
             case 'z':
                 if (inclass) break;
                 if (create) root = new End();
