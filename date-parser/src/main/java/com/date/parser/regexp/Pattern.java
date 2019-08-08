@@ -33,13 +33,6 @@ public final class Pattern {
     public static final int CASE_INSENSITIVE = 0x02;
 
     /**
-     * 允许模板中出现空格和注释，此模式下，空格会被忽略，并且内嵌注释(#至行尾)也会被忽略。
-     * <p>
-     * 此模式可以通过内嵌表达式`(?x)`启用
-     */
-    public static final int COMMENTS = 0x04;
-
-    /**
      * 启用dotall模式，此模式下，表达式`.`会匹配任何字符包括换行符，而默认情况下它不会匹配到换行符。
      * <p>
      * 可以通过内嵌表达式`(?s)`启用，s等价于single-line的缩写。
@@ -388,8 +381,6 @@ public final class Pattern {
      */
     private void accept(int ch, String s) {
         int testChar = temp[cursor++];
-        if (has(COMMENTS))
-            testChar = parsePastWhitespace(testChar);
         if (ch != testChar) {
             throw error(s);
         }
@@ -406,27 +397,13 @@ public final class Pattern {
      * Peek the next character, and do not advance the cursor.
      */
     private int peek() {
-        int ch = temp[cursor];
-        if (has(COMMENTS))
-            ch = peekPastWhitespace(ch);
-        return ch;
+        return temp[cursor];
     }
 
     /**
      * Read the next character, and advance the cursor by one.
      */
     private int read() {
-        int ch = temp[cursor++];
-        if (has(COMMENTS))
-            ch = parsePastWhitespace(ch);
-        return ch;
-    }
-
-    /**
-     * Read the next character, and advance the cursor by one,
-     * ignoring the COMMENTS setting
-     */
-    private int readEscaped() {
         return temp[cursor++];
     }
 
@@ -434,10 +411,7 @@ public final class Pattern {
      * Advance the cursor by one, and peek the next character.
      */
     private int next() {
-        int ch = temp[++cursor];
-        if (has(COMMENTS))
-            ch = peekPastWhitespace(ch);
-        return ch;
+        return temp[++cursor];
     }
 
     /**
@@ -446,67 +420,6 @@ public final class Pattern {
      */
     private int nextEscaped() {
         return temp[++cursor];
-    }
-
-    /**
-     * If in xmode peek past whitespace and comments.
-     */
-    private int peekPastWhitespace(int ch) {
-        while (ASCII.isSpace(ch) || ch == '#') {
-            while (ASCII.isSpace(ch))
-                ch = temp[++cursor];
-            if (ch == '#') {
-                ch = peekPastLine();
-            }
-        }
-        return ch;
-    }
-
-    /**
-     * If in xmode parse past whitespace and comments.
-     */
-    private int parsePastWhitespace(int ch) {
-        while (ASCII.isSpace(ch) || ch == '#') {
-            while (ASCII.isSpace(ch))
-                ch = temp[cursor++];
-            if (ch == '#')
-                ch = parsePastLine();
-        }
-        return ch;
-    }
-
-    /**
-     * xmode parse past comment to end of line.
-     */
-    private int parsePastLine() {
-        int ch = temp[cursor++];
-        while (ch != 0 && !isLineSeparator(ch))
-            ch = temp[cursor++];
-        return ch;
-    }
-
-    /**
-     * xmode peek past comment to end of line.
-     */
-    private int peekPastLine() {
-        int ch = temp[++cursor];
-        while (ch != 0 && !isLineSeparator(ch))
-            ch = temp[++cursor];
-        return ch;
-    }
-
-    /**
-     * Determines if character is a line separator in the current mode
-     */
-    private boolean isLineSeparator(int ch) {
-        if (has(UNIX_LINES)) {
-            return ch == '\n';
-        } else {
-            return (ch == '\n' ||
-                    ch == '\r' ||
-                    (ch | 1) == '\u2029' ||
-                    ch == '\u0085');
-        }
     }
 
     /**
@@ -1542,9 +1455,6 @@ public final class Pattern {
                 case 'd':
                     flags |= UNIX_LINES;
                     break;
-                case 'x':
-                    flags |= COMMENTS;
-                    break;
                 case '-': // subFlag then fall through
                     next();
                     subFlag();
@@ -1571,9 +1481,6 @@ public final class Pattern {
                     break;
                 case 'd':
                     flags &= ~UNIX_LINES;
-                    break;
-                case 'x':
-                    flags &= ~COMMENTS;
                     break;
                 default:
                     return;
