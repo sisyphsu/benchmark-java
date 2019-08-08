@@ -1,14 +1,13 @@
 package com.date.parser.regexp;
 
-import java.text.Normalizer;
-import java.util.*;
-import java.util.function.Predicate;
-import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
 
 public final class Pattern {
 
-    /**
+    /*
      * Regular expression modifier values.  Instead of being passed as
      * arguments, they can also be passed as inline modifiers.
      * For example, the following statements have the same effect.
@@ -144,23 +143,6 @@ public final class Pattern {
         return new Pattern(regex, 0);
     }
 
-    /**
-     * Compiles the given regular expression into a pattern with the given flags.
-     *
-     * @param regex The expression to be compiled
-     * @param flags Match flags, a bit mask that may include
-     *              {@link #CASE_INSENSITIVE}, {@link #MULTILINE}, {@link #DOTALL},
-     *              {@link #UNICODE_CASE}, {@link #CANON_EQ}, {@link #UNIX_LINES},
-     *              {@link #LITERAL}, {@link #UNICODE_CHARACTER_CLASS}
-     *              and {@link #COMMENTS}
-     * @return the given regular expression compiled into a pattern with the given flags
-     * @throws IllegalArgumentException If bit values other than those corresponding to the defined match flags are set in <tt>flags</tt>
-     * @throws PatternSyntaxException   If the expression's syntax is invalid
-     */
-    public static Pattern compile(String regex, int flags) {
-        return new Pattern(regex, flags);
-    }
-
     public String toString() {
         return pattern;
     }
@@ -211,124 +193,6 @@ public final class Pattern {
         } else {
             root = new Start(lastAccept);
             matchRoot = lastAccept;
-        }
-    }
-
-    /**
-     * Given a specific sequence composed of a regular character and combining marks that follow it,
-     * produce the alternation that will match all canonical equivalences of that sequence.
-     * <p>
-     * 给定由常规字符组成的特定序列并在其后面组合标记，产生将匹配该序列的所有规范等价的交替。
-     */
-    private String produceEquivalentAlternation(String source) {
-        int len = countChars(source, 0, 1);
-        if (source.length() == len)
-            // source has one character.
-            return source;
-
-        String base = source.substring(0, len);
-        String combiningMarks = source.substring(len);
-
-        String[] perms = producePermutations(combiningMarks);
-        StringBuilder result = new StringBuilder(source);
-
-        // Add combined permutations
-        for (int x = 0; x < perms.length; x++) {
-            String next = base + perms[x];
-            if (x > 0)
-                result.append("|").append(next);
-            next = composeOneStep(next);
-            if (next != null)
-                result.append("|").append(produceEquivalentAlternation(next));
-        }
-        return result.toString();
-    }
-
-    /**
-     * Returns an array of strings that have all the possible permutations of the characters in the input string.
-     * This is used to get a list of all possible orderings of a set of combining marks.
-     * Note that some of the permutations are invalid because of combining class collisions,
-     * and these possibilities must be removed because they are not canonically equivalent.
-     */
-    private String[] producePermutations(String input) {
-        if (input.length() == countChars(input, 0, 1))
-            return new String[]{input};
-
-        if (input.length() == countChars(input, 0, 2)) {
-            int c0 = Character.codePointAt(input, 0);
-            int c1 = Character.codePointAt(input, Character.charCount(c0));
-            if (getClass(c1) == getClass(c0)) {
-                return new String[]{input};
-            }
-            String[] result = new String[2];
-            result[0] = input;
-            StringBuilder sb = new StringBuilder(2);
-            sb.appendCodePoint(c1);
-            sb.appendCodePoint(c0);
-            result[1] = sb.toString();
-            return result;
-        }
-
-        int length = 1;
-        int nCodePoints = countCodePoints(input);
-        for (int x = 1; x < nCodePoints; x++)
-            length = length * (x + 1);
-
-        String[] temp = new String[length];
-
-        int[] combClass = new int[nCodePoints];
-        for (int x = 0, i = 0; x < nCodePoints; x++) {
-            int c = Character.codePointAt(input, i);
-            combClass[x] = getClass(c);
-            i += Character.charCount(c);
-        }
-
-        // For each char, take it out and add the permutations of the remaining chars
-        int index = 0;
-        int len;
-        // offset maintains the index in code units.
-        loop:
-        for (int x = 0, offset = 0; x < nCodePoints; x++, offset += len) {
-            len = countChars(input, offset, 1);
-            for (int y = x - 1; y >= 0; y--) {
-                if (combClass[y] == combClass[x]) {
-                    continue loop;
-                }
-            }
-            StringBuilder sb = new StringBuilder(input);
-            String otherChars = sb.delete(offset, offset + len).toString();
-            String[] subResult = producePermutations(otherChars);
-
-            String prefix = input.substring(offset, offset + len);
-            for (String s : subResult)
-                temp[index++] = prefix + s;
-        }
-        String[] result = new String[index];
-        System.arraycopy(temp, 0, result, 0, index);
-        return result;
-    }
-
-    private int getClass(int c) {
-        return sun.text.Normalizer.getCombiningClass(c);
-    }
-
-    /**
-     * Attempts to compose input by combining the first character
-     * with the first combining mark following it. Returns a String
-     * that is the composition of the leading character with its first
-     * combining mark followed by the remaining combining marks. Returns
-     * null if the first two characters cannot be further composed.
-     */
-    private String composeOneStep(String input) {
-        int len = countChars(input, 0, 2);
-        String firstTwoCharacters = input.substring(0, len);
-        String result = Normalizer.normalize(firstTwoCharacters, Normalizer.Form.NFC);
-
-        if (result.equals(firstTwoCharacters))
-            return null;
-        else {
-            String remainder = input.substring(len);
-            return result + remainder;
         }
     }
 
@@ -722,7 +586,7 @@ public final class Pattern {
         return ch >= Character.MIN_SUPPLEMENTARY_CODE_POINT || Character.isSurrogate((char) ch);
     }
 
-    /**
+    /*
      *  The following methods handle the main parsing. They are sorted
      *  according to their precedence order, the lowest one first.
      */
@@ -1067,9 +931,7 @@ public final class Pattern {
             case 'C':
                 break;
             case 'D':
-                if (create) root = false
-                        ? new Utype(UnicodeProp.DIGIT).complement()
-                        : new Ctype(ASCII.DIGIT).complement();
+                if (create) root = new Ctype(ASCII.DIGIT).complement();
                 return -1;
             case 'E':
             case 'F':
@@ -1096,9 +958,7 @@ public final class Pattern {
                 if (create) root = new LineEnding();
                 return -1;
             case 'S':
-                if (create) root = false
-                        ? new Utype(UnicodeProp.WHITE_SPACE).complement()
-                        : new Ctype(ASCII.SPACE).complement();
+                if (create) root = new Ctype(ASCII.SPACE).complement();
                 return -1;
             case 'T':
             case 'U':
@@ -1107,9 +967,7 @@ public final class Pattern {
                 if (create) root = new VertWS().complement();
                 return -1;
             case 'W':
-                if (create) root = false
-                        ? new Utype(UnicodeProp.WORD).complement()
-                        : new Ctype(ASCII.WORD).complement();
+                if (create) root = new Ctype(ASCII.WORD).complement();
                 return -1;
             case 'X':
             case 'Y':
@@ -1132,9 +990,7 @@ public final class Pattern {
             case 'c':
                 return c();
             case 'd':
-                if (create) root = false
-                        ? new Utype(UnicodeProp.DIGIT)
-                        : new Ctype(ASCII.DIGIT);
+                if (create) root = new Ctype(ASCII.DIGIT);
                 return -1;
             case 'e':
                 return '\033';
@@ -1175,9 +1031,7 @@ public final class Pattern {
             case 'r':
                 return '\r';
             case 's':
-                if (create) root = false
-                        ? new Utype(UnicodeProp.WHITE_SPACE)
-                        : new Ctype(ASCII.SPACE);
+                if (create) root = new Ctype(ASCII.SPACE);
                 return -1;
             case 't':
                 return '\t';
@@ -1197,9 +1051,7 @@ public final class Pattern {
                 if (create) root = new VertWS();
                 return -1;
             case 'w':
-                if (create) root = false
-                        ? new Utype(UnicodeProp.WORD)
-                        : new Ctype(ASCII.WORD);
+                if (create) root = new Ctype(ASCII.WORD);
                 return -1;
             case 'x':
                 return x();
@@ -1341,7 +1193,6 @@ public final class Pattern {
            (6)AngstromSign u+212b
               toLowerCase(u+212b) ==> u+00e5
         */
-        int d;
         if (ch < 256 && !(has(CASE_INSENSITIVE) && has(UNICODE_CASE) &&
                 (ch == 0xff || ch == 0xb5 ||
                         ch == 0x49 || ch == 0x69 ||  //I and i
@@ -1411,8 +1262,7 @@ public final class Pattern {
     /**
      * Parses a Unicode character family and returns its representative node.
      */
-    private CharProperty family(boolean singleLetter,
-                                boolean maybeComplement) {
+    private CharProperty family(boolean singleLetter, boolean maybeComplement) {
         next();
         String name;
         CharProperty node = null;
@@ -1457,8 +1307,7 @@ public final class Pattern {
                     node = charPropertyNodeFor(value);
                     break;
                 default:
-                    throw error("Unknown Unicode property {name=<" + name + ">, "
-                            + "value=<" + value + ">}");
+                    throw error("Unknown Unicode property {name=<" + name + ">, value=<" + value + ">}");
             }
         } else {
             if (name.startsWith("In")) {
@@ -1475,13 +1324,7 @@ public final class Pattern {
                 if (node == null)
                     node = unicodeScriptPropertyFor(name);
             } else {
-                if (false) {
-                    UnicodeProp uprop = UnicodeProp.forPOSIXName(name);
-                    if (uprop != null)
-                        node = new Utype(uprop);
-                }
-                if (node == null)
-                    node = charPropertyNodeFor(name);
+                node = charPropertyNodeFor(name);
             }
         }
         if (maybeComplement) {
@@ -1537,8 +1380,7 @@ public final class Pattern {
     private String groupname(int ch) {
         StringBuilder sb = new StringBuilder();
         sb.append(Character.toChars(ch));
-        while (ASCII.isLower(ch = read()) || ASCII.isUpper(ch) ||
-                ASCII.isDigit(ch)) {
+        while (ASCII.isLower(ch = read()) || ASCII.isUpper(ch) || ASCII.isDigit(ch)) {
             sb.append(Character.toChars(ch));
         }
         if (sb.length() == 0)
@@ -1612,10 +1454,8 @@ public final class Pattern {
                     boolean hasSupplementary = findSupplementary(start, patternLength);
                     if (ch == '=') {
                         head = tail = (hasSupplementary ?
-                                new BehindS(head, info.maxLength,
-                                        info.minLength) :
-                                new Behind(head, info.maxLength,
-                                        info.minLength));
+                                new BehindS(head, info.maxLength, info.minLength) :
+                                new Behind(head, info.maxLength, info.minLength));
                     } else if (ch == '!') {
                         head = tail = (hasSupplementary ? new NotBehindS(head, info.maxLength, info.minLength) :
                                 new NotBehind(head, info.maxLength, info.minLength));
@@ -2020,20 +1860,6 @@ public final class Pattern {
         return index - x;
     }
 
-    private static int countCodePoints(CharSequence seq) {
-        int length = seq.length();
-        int n = 0;
-        for (int i = 0; i < length; ) {
-            n++;
-            if (Character.isHighSurrogate(seq.charAt(i++))) {
-                if (i < length && Character.isLowSurrogate(seq.charAt(i))) {
-                    i++;
-                }
-            }
-        }
-        return n;
-    }
-
     /**
      * Creates a bit vector for matching Latin-1 values. A normal BitClass
      * never matches values above Latin-1, and a complemented BitClass always
@@ -2398,8 +2224,7 @@ public final class Pattern {
                         return false;
                     if (multiline)
                         return next.match(matcher, i, seq);
-                } else if (ch == '\r' || ch == '\u0085' ||
-                        (ch | 1) == '\u2029') {
+                } else if (ch == '\r' || ch == '\u0085' || (ch | 1) == '\u2029') {
                     if (multiline)
                         return next.match(matcher, i, seq);
                 } else { // No line terminator, no match
@@ -2432,8 +2257,7 @@ public final class Pattern {
         }
 
         boolean match(Matcher matcher, int i, CharSequence seq) {
-            int endIndex = (matcher.anchoringBounds) ?
-                    matcher.to : matcher.getTextLength();
+            int endIndex = (matcher.anchoringBounds) ? matcher.to : matcher.getTextLength();
             if (i < endIndex) {
                 char ch = seq.charAt(i);
                 if (ch == '\n') {
@@ -2757,8 +2581,7 @@ public final class Pattern {
                     return false;
                 }
                 int c = seq.charAt(i + j);
-                if (buf[j] != c &&
-                        buf[j] != ASCII.toLower(c))
+                if (buf[j] != c && buf[j] != ASCII.toLower(c))
                     return false;
             }
             return next.match(matcher, i + len, seq);
@@ -2783,8 +2606,7 @@ public final class Pattern {
                     return false;
                 }
                 int c = seq.charAt(i + j);
-                if (buf[j] != c &&
-                        buf[j] != Character.toLowerCase(Character.toUpperCase(c)))
+                if (buf[j] != c && buf[j] != Character.toLowerCase(Character.toUpperCase(c)))
                     return false;
             }
             return next.match(matcher, i + len, seq);
@@ -2876,8 +2698,7 @@ public final class Pattern {
     /**
      * Returns node for matching characters within an explicit value range.
      */
-    private static CharProperty rangeFor(final int lower,
-                                         final int upper) {
+    private static CharProperty rangeFor(final int lower, final int upper) {
         return new CharProperty() {
             boolean isSatisfiedBy(int ch) {
                 return inRange(lower, ch, upper);
@@ -2889,8 +2710,7 @@ public final class Pattern {
      * Returns node for matching characters within an explicit value
      * range in a case insensitive manner.
      */
-    private CharProperty caseInsensitiveRangeFor(final int lower,
-                                                 final int upper) {
+    private CharProperty caseInsensitiveRangeFor(final int lower, final int upper) {
         if (has(UNICODE_CASE))
             return new CharProperty() {
                 boolean isSatisfiedBy(int ch) {
@@ -2952,11 +2772,9 @@ public final class Pattern {
         boolean match(Matcher matcher, int i, CharSequence seq) {
             switch (type) {
                 case GREEDY:
-                    return (atom.match(matcher, i, seq) && next.match(matcher, matcher.last, seq))
-                            || next.match(matcher, i, seq);
+                    return (atom.match(matcher, i, seq) && next.match(matcher, matcher.last, seq)) || next.match(matcher, i, seq);
                 case LAZY:
-                    return next.match(matcher, i, seq)
-                            || (atom.match(matcher, i, seq) && next.match(matcher, matcher.last, seq));
+                    return next.match(matcher, i, seq) || (atom.match(matcher, i, seq) && next.match(matcher, matcher.last, seq));
                 case POSSESSIVE:
                     if (atom.match(matcher, i, seq)) i = matcher.last;
                     return next.match(matcher, i, seq);
@@ -3141,8 +2959,7 @@ public final class Pattern {
         int groupIndex;
         boolean capture;
 
-        GroupCurly(Node node, int cmin, int cmax, int type, int local,
-                   int group, boolean capture) {
+        GroupCurly(Node node, int cmin, int cmax, int type, int local, int group, boolean capture) {
             this.atom = node;
             this.type = type;
             this.cmin = cmin;
@@ -3727,9 +3544,7 @@ public final class Pattern {
                     if (doUnicodeCase) {
                         int cc1 = Character.toUpperCase(c1);
                         int cc2 = Character.toUpperCase(c2);
-                        if (cc1 != cc2 &&
-                                Character.toLowerCase(cc1) !=
-                                        Character.toLowerCase(cc2))
+                        if (cc1 != cc2 && Character.toLowerCase(cc1) != Character.toLowerCase(cc2))
                             return false;
                     } else {
                         if (ASCII.toLower(c1) != ASCII.toLower(c2))
@@ -3764,8 +3579,7 @@ public final class Pattern {
 
         boolean match(Matcher matcher, int i, CharSequence seq) {
             if (atom instanceof BnM) {
-                return atom.match(matcher, i, seq)
-                        && next.match(matcher, matcher.last, seq);
+                return atom.match(matcher, i, seq) && next.match(matcher, matcher.last, seq);
             }
             for (; ; ) {
                 if (i > matcher.to) {
@@ -3836,8 +3650,7 @@ public final class Pattern {
                 if (i < matcher.to) {
                     conditionMatched = !cond.match(matcher, i, seq);
                 } else {
-                    // If a negative lookahead succeeds then more input
-                    // could cause it to fail!
+                    // If a negative lookahead succeeds then more input could cause it to fail!
                     matcher.requireEnd = true;
                     conditionMatched = !cond.match(matcher, i, seq);
                 }
@@ -3999,8 +3812,7 @@ public final class Pattern {
     /**
      * Returns the set union of two CharProperty nodes.
      */
-    private static CharProperty union(final CharProperty lhs,
-                                      final CharProperty rhs) {
+    private static CharProperty union(final CharProperty lhs, final CharProperty rhs) {
         return new CharProperty() {
             boolean isSatisfiedBy(int ch) {
                 return lhs.isSatisfiedBy(ch) || rhs.isSatisfiedBy(ch);
@@ -4011,8 +3823,7 @@ public final class Pattern {
     /**
      * Returns the set intersection of two CharProperty nodes.
      */
-    private static CharProperty intersection(final CharProperty lhs,
-                                             final CharProperty rhs) {
+    private static CharProperty intersection(final CharProperty lhs, final CharProperty rhs) {
         return new CharProperty() {
             boolean isSatisfiedBy(int ch) {
                 return lhs.isSatisfiedBy(ch) && rhs.isSatisfiedBy(ch);
@@ -4023,8 +3834,7 @@ public final class Pattern {
     /**
      * Returns the set difference of two CharProperty nodes.
      */
-    private static CharProperty setDifference(final CharProperty lhs,
-                                              final CharProperty rhs) {
+    private static CharProperty setDifference(final CharProperty lhs, final CharProperty rhs) {
         return new CharProperty() {
             boolean isSatisfiedBy(int ch) {
                 return !rhs.isSatisfiedBy(ch) && lhs.isSatisfiedBy(ch);
@@ -4253,60 +4063,6 @@ public final class Pattern {
     }
 
     /**
-     * Supplementary support version of BnM(). Unpaired surrogates are
-     * also handled by this class.
-     */
-    static final class BnMS extends BnM {
-        int lengthInChars;
-
-        BnMS(int[] src, int[] lastOcc, int[] optoSft, Node next) {
-            super(src, lastOcc, optoSft, next);
-            for (int i : buffer) {
-                lengthInChars += Character.charCount(i);
-            }
-        }
-
-        boolean match(Matcher matcher, int i, CharSequence seq) {
-            int[] src = buffer;
-            int patternLength = src.length;
-            int last = matcher.to - lengthInChars;
-
-            // Loop over all possible match positions in text
-            NEXT:
-            while (i <= last) {
-                // Loop over pattern from right to left
-                int ch;
-                for (int j = countChars(seq, i, patternLength), x = patternLength - 1;
-                     j > 0; j -= Character.charCount(ch), x--) {
-                    ch = Character.codePointBefore(seq, i + j);
-                    if (ch != src[x]) {
-                        // Shift search to the right by the maximum of the
-                        // bad character shift and the good suffix shift
-                        int n = Math.max(x + 1 - lastOcc[ch & 0x7F], optoSft[x]);
-                        i += countChars(seq, i, n);
-                        continue NEXT;
-                    }
-                }
-                // Entire pattern matched starting at i
-                matcher.first = i;
-                boolean ret = next.match(matcher, i + lengthInChars, seq);
-                if (ret) {
-                    matcher.first = i;
-                    matcher.groups[0] = matcher.first;
-                    matcher.groups[1] = matcher.last;
-                    return true;
-                }
-                i += countChars(seq, i, 1);
-            }
-            matcher.hitEnd = true;
-            return false;
-        }
-    }
-
-///////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////
-
-    /**
      * This must be the very first initializer.
      */
     static Node accept = new Node();
@@ -4324,8 +4080,7 @@ public final class Pattern {
             abstract CharProperty make();
         }
 
-        private static void defCategory(String name,
-                                        final int typeMask) {
+        private static void defCategory(String name, final int typeMask) {
             map.put(name, new CharPropertyFactory() {
                 CharProperty make() {
                     return new Category(typeMask);
@@ -4333,8 +4088,7 @@ public final class Pattern {
             });
         }
 
-        private static void defRange(String name,
-                                     final int lower, final int upper) {
+        private static void defRange(String name, final int lower, final int upper) {
             map.put(name, new CharPropertyFactory() {
                 CharProperty make() {
                     return rangeFor(lower, upper);
@@ -4342,8 +4096,7 @@ public final class Pattern {
             });
         }
 
-        private static void defCtype(String name,
-                                     final int ctype) {
+        private static void defCtype(String name, final int ctype) {
             map.put(name, new CharPropertyFactory() {
                 CharProperty make() {
                     return new Ctype(ctype);
@@ -4351,8 +4104,7 @@ public final class Pattern {
             });
         }
 
-        private static abstract class CloneableProperty
-                extends CharProperty implements Cloneable {
+        private static abstract class CloneableProperty extends CharProperty implements Cloneable {
             public CloneableProperty clone() {
                 try {
                     return (CloneableProperty) super.clone();
@@ -4362,8 +4114,7 @@ public final class Pattern {
             }
         }
 
-        private static void defClone(String name,
-                                     final CloneableProperty p) {
+        private static void defClone(String name, final CloneableProperty p) {
             map.put(name, new CharPropertyFactory() {
                 CharProperty make() {
                     return p.clone();
@@ -4371,8 +4122,7 @@ public final class Pattern {
             });
         }
 
-        private static final HashMap<String, CharPropertyFactory> map
-                = new HashMap<>();
+        private static final HashMap<String, CharPropertyFactory> map = new HashMap<>();
 
         static {
             // Unicode character property aliases, defined in
@@ -4562,108 +4312,4 @@ public final class Pattern {
         }
     }
 
-    /**
-     * Creates a predicate which can be used to match a string.
-     *
-     * @return The predicate which can be used for matching on a string
-     * @since 1.8
-     */
-    public Predicate<String> asPredicate() {
-        return s -> matcher(s).find();
-    }
-
-    /**
-     * Creates a stream from the given input sequence around matches of this
-     * pattern.
-     *
-     * <p> The stream returned by this method contains each substring of the
-     * input sequence that is terminated by another subsequence that matches
-     * this pattern or is terminated by the end of the input sequence.  The
-     * substrings in the stream are in the order in which they occur in the
-     * input. Trailing empty strings will be discarded and not encountered in
-     * the stream.
-     *
-     * <p> If this pattern does not match any subsequence of the input then
-     * the resulting stream has just one element, namely the input sequence in
-     * string form.
-     *
-     * <p> When there is a positive-width match at the beginning of the input
-     * sequence then an empty leading substring is included at the beginning
-     * of the stream. A zero-width match at the beginning however never produces
-     * such empty leading substring.
-     *
-     * <p> If the input sequence is mutable, it must remain constant during the
-     * execution of the terminal stream operation.  Otherwise, the result of the
-     * terminal stream operation is undefined.
-     *
-     * @param input The character sequence to be split
-     * @return The stream of strings computed by splitting the input
-     * around matches of this pattern
-     * @see #split(CharSequence)
-     * @since 1.8
-     */
-    public Stream<String> splitAsStream(final CharSequence input) {
-        class MatcherIterator implements Iterator<String> {
-            private final Matcher matcher;
-            // The start position of the next sub-sequence of input
-            // when current == input.length there are no more elements
-            private int current;
-            // null if the next element, if any, needs to obtained
-            private String nextElement;
-            // > 0 if there are N next empty elements
-            private int emptyElementCount;
-
-            MatcherIterator() {
-                this.matcher = matcher(input);
-            }
-
-            public String next() {
-                if (!hasNext())
-                    throw new NoSuchElementException();
-
-                if (emptyElementCount == 0) {
-                    String n = nextElement;
-                    nextElement = null;
-                    return n;
-                } else {
-                    emptyElementCount--;
-                    return "";
-                }
-            }
-
-            public boolean hasNext() {
-                if (nextElement != null || emptyElementCount > 0)
-                    return true;
-
-                if (current == input.length())
-                    return false;
-
-                // Consume the next matching element
-                // Count sequence of matching empty elements
-                while (matcher.find()) {
-                    nextElement = input.subSequence(current, matcher.start()).toString();
-                    current = matcher.end();
-                    if (!nextElement.isEmpty()) {
-                        return true;
-                    } else if (current > 0) { // no empty leading substring for zero-width
-                        // match at the beginning of the input
-                        emptyElementCount++;
-                    }
-                }
-
-                // Consume last matching element
-                nextElement = input.subSequence(current, input.length()).toString();
-                current = input.length();
-                if (!nextElement.isEmpty()) {
-                    return true;
-                } else {
-                    // Ignore a terminal sequence of matching empty elements
-                    emptyElementCount = 0;
-                    nextElement = null;
-                    return false;
-                }
-            }
-        }
-        return StreamSupport.stream(Spliterators.spliteratorUnknownSize(new MatcherIterator(), Spliterator.ORDERED | Spliterator.NONNULL), false);
-    }
 }

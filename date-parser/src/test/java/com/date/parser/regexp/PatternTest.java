@@ -12,6 +12,10 @@ public class PatternTest {
     public void test() {
         Pattern ptn = Pattern.compile("^\\d+(\\D\\w+)$");
         System.out.println(ptn);
+        Pattern.printObjectTree(ptn.root);
+
+        System.out.println(ptn.matcher("").matches());
+        System.out.println(ptn.matcher("123afsdfsdsdf").matches());
     }
 
 }
