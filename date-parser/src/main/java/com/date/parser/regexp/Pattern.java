@@ -9,10 +9,6 @@ public final class Pattern {
     private String pattern;
     private int flags;
     /**
-     * 规范化的模板字符串，用于支持特殊的模式，一般情况下与pattern相同
-     */
-    private transient String normalizedPattern;
-    /**
      * 匹配操作状态机的起点
      */
     transient Node root;
@@ -104,22 +100,19 @@ public final class Pattern {
     }
 
     /**
-     * Copies regular expression to an int array and invokes the parsing
-     * of the expression which will create the object tree.
+     * Copies regular expression to an int array and invokes the parsing of the expression which will create the object tree.
+     * 编译正则表达式，复制为int数组然后调用相关的解析器并创建Node对象树
      */
     private void compile() {
-        normalizedPattern = pattern;
-        patternLength = normalizedPattern.length();
+        patternLength = pattern.length();
 
-        // Copy pattern to int array for convenience
-        // Use double zero to terminate pattern
-        temp = new int[patternLength + 2];
+        temp = new int[patternLength + 2]; // 复制为int数组，使用00表示结束
 
         hasSupplementary = false;
         int c, count = 0;
         // Convert all chars into code points
         for (int x = 0; x < patternLength; x += Character.charCount(c)) {
-            c = normalizedPattern.codePointAt(x);
+            c = pattern.codePointAt(x);
             if (isSupplementary(c)) {
                 hasSupplementary = true;
             }
@@ -208,7 +201,7 @@ public final class Pattern {
     }
 
     /**
-     * Used to accumulate information about a subtree of the object graph so that optimizations can be applied to the subtree.
+     * 用于积累子树信息，从而可以针对子树进行优化
      */
     static final class TreeInfo {
         int minLength;
@@ -231,53 +224,45 @@ public final class Pattern {
     // 以下私有方法主要用于提高代码可读性，为了让Java编译器容易地inline这些函数，它们不应该有太多的判断或错误检查等。
 
     /**
-     * Match next character, signal error if failed.
+     * 匹配下一个字符，如果它不是指定内容的话就抛出错误
      */
-    private void accept(int ch, String s) {
+    private void accept(int ch, String msg) {
         int testChar = temp[cursor++];
         if (ch != testChar) {
-            throw error(s);
+            throw error(msg);
         }
     }
 
     /**
-     * Mark the end of pattern with a specific character.
+     * 使用指定字符标记pattern的结尾
      */
     private void mark(int c) {
         temp[patternLength] = c;
     }
 
     /**
-     * Peek the next character, and do not advance the cursor.
+     * 获取一个字符但不前移指针
      */
     private int peek() {
         return temp[cursor];
     }
 
     /**
-     * Read the next character, and advance the cursor by one.
+     * 读取一个字符并前移一位指针，类似于队列的poll
      */
     private int read() {
         return temp[cursor++];
     }
 
     /**
-     * Advance the cursor by one, and peek the next character.
+     * 先前移一位指针然后读取一个字符，即忽略当前字符直接获取下一位，指针移动与read相同
      */
     private int next() {
         return temp[++cursor];
     }
 
     /**
-     * Advance the cursor by one, and peek the next character,
-     * ignoring the COMMENTS setting
-     */
-    private int nextEscaped() {
-        return temp[++cursor];
-    }
-
-    /**
-     * Read the character after the next one, and advance the cursor by two.
+     * 读取下一位字符，然后指针前移2位，读取到的数据等价于next
      */
     private int skip() {
         int i = cursor;
@@ -287,23 +272,21 @@ public final class Pattern {
     }
 
     /**
-     * Unread one next character, and retreat cursor by one.
+     * 退回一个字符，读取指针倒退一位
      */
     private void unread() {
         cursor--;
     }
 
     /**
-     * Internal method used for handling all syntax errors. The pattern is
-     * displayed with a pointer to aid in locating the syntax error.
+     * 用于处理语法错误的内部方法
      */
     private PatternSyntaxException error(String s) {
-        return new PatternSyntaxException(s, normalizedPattern, cursor - 1);
+        return new PatternSyntaxException(s, pattern, cursor - 1);
     }
 
     /**
-     * Determines if there is any supplementary character or unpaired
-     * surrogate in the specified range.
+     * 判断指定范围内是否存在任何补充字符(>65535)或不成对的代理(\uD800 ~ \uDFFF)
      */
     private boolean findSupplementary(int start, int end) {
         for (int i = start; i < end; i++) {
@@ -314,22 +297,17 @@ public final class Pattern {
     }
 
     /**
-     * Determines if the specified code point is a supplementary
-     * character or unpaired surrogate.
+     * 判断指定char是一个补充字符(>65535)或不成对的代理(\uD800 ~ \uDFFF)
      */
     private static boolean isSupplementary(int ch) {
         return ch >= Character.MIN_SUPPLEMENTARY_CODE_POINT || Character.isSurrogate((char) ch);
     }
 
-    /*
-     *  The following methods handle the main parsing. They are sorted
-     *  according to their precedence order, the lowest one first.
-     */
+    // 以下是正则表达式解析的主要逻辑，它们根据优先级排序，最低优先级的方法放在最前面
 
     /**
-     * The expression is parsed with branch nodes added for alternations.
-     * This may be called recursively to parse sub expressions that may
-     * contain alternations.
+     * 解析多个表达式or并存的规则分支，它可以递归地解析全部子表达式。
+     * 类似于: [0-9]|[a-z]|[A-Z]
      */
     private Node expr(Node end) {
         Node prev = null;
@@ -338,21 +316,19 @@ public final class Pattern {
         Node branchConn = null;
 
         for (; ; ) {
-            Node node = sequence(end);
             Node nodeTail = root;      //double return
+            Node node = sequence(end); // 读取子表达式节点
             if (prev == null) {
                 prev = node;
                 firstTail = nodeTail;
             } else {
-                // Branch
+                // or分支处理，前一个字符为'|'
                 if (branchConn == null) {
                     branchConn = new BranchConn();
                     branchConn.next = end;
                 }
                 if (node == end) {
-                    // if the node returned from sequence() is "end"
-                    // we have an empty expr, set a null atom into
-                    // the branch to indicate to go "next" directly.
+                    // 如果sequence()返回的节点是end，则解析到的是一个空的expr，设置分支的节点为null标明此分支可以直接进入next
                     node = null;
                 } else {
                     // the "tail.next" of each atom goes to branchConn
@@ -379,7 +355,7 @@ public final class Pattern {
     }
 
     /**
-     * Parsing of sequences between alternations.
+     * 解析替换符(|)之间的一个连续的表达式
      */
     private Node sequence(Node end) {
         Node head = null;
@@ -390,10 +366,8 @@ public final class Pattern {
             int ch = peek();
             switch (ch) {
                 case '(':
-                    // Because group handles its own closure,
-                    // we need to treat it differently
+                    // Because group handles its own closure, we need to treat it differently
                     node = group0();
-                    // Check for comment or flag group
                     if (node == null)
                         continue;
                     if (head == null)
@@ -407,7 +381,7 @@ public final class Pattern {
                     node = clazz(true);
                     break;
                 case '\\':
-                    ch = nextEscaped();
+                    ch = next();
                     if (ch == 'p' || ch == 'P') {
                         boolean oneLetter = true;
                         boolean comp = (ch == 'P');
@@ -502,7 +476,7 @@ public final class Pattern {
                 case ')':
                     break;
                 case '\\':
-                    ch = nextEscaped();
+                    ch = next();
                     if (ch == 'p' || ch == 'P') { // Property
                         if (first > 0) { // Slice is waiting; handle it first
                             unread();
@@ -555,7 +529,9 @@ public final class Pattern {
         if (first == 1) {
             return newSingle(buffer[0]);
         } else {
-            return newSlice(buffer, first, hasSupplementary);
+            int[] tmp = new int[first];
+            System.arraycopy(buffer, 0, tmp, 0, first);
+            return hasSupplementary ? new SliceS(tmp) : new Slice(tmp);
         }
     }
 
@@ -619,7 +595,7 @@ public final class Pattern {
         int ch = skip();
         switch (ch) {
             case '0':
-                return o();
+                return octalEscape();
             case '1':
             case '2':
             case '3':
@@ -704,7 +680,7 @@ public final class Pattern {
                 if (create) root = new Bound(Bound.BOTH, false);
                 return -1;
             case 'c':
-                return c();
+                return controlEscape();
             case 'd':
                 if (create) root = new Ctype(ASCII.DIGIT);
                 return -1;
@@ -755,7 +731,7 @@ public final class Pattern {
                 if (create) root = new Ctype(ASCII.WORD);
                 return -1;
             case 'x':
-                return x();
+                return hexadecimalEscape();
             case 'z':
                 if (inclass) break;
                 if (create) root = new End();
@@ -899,13 +875,12 @@ public final class Pattern {
     }
 
     /**
-     * Parse a single character or a character range in a character class
-     * and return its representative node.
+     * 解析字符类中的单个字符或字符范围并返回其代表节点。
      */
     private CharProperty range(BitClass bits) {
         int ch = peek();
         if (ch == '\\') {
-            ch = nextEscaped();
+            ch = next();
             if (ch == 'p' || ch == 'P') { // A property
                 boolean comp = (ch == 'P');
                 boolean oneLetter = true;
@@ -1083,9 +1058,8 @@ public final class Pattern {
     }
 
     /**
-     * Parses a group and returns the head node of a set of nodes that process
-     * the group. Sometimes a double return system is used where the tail is
-     * returned in root.
+     * 解析group为一个或多个节点，然后返回head节点。
+     * Sometimes a double return system is used where the tail is returned in root.
      */
     private Node group0() {
         boolean capturingGroup = false;
@@ -1093,9 +1067,9 @@ public final class Pattern {
         Node tail;
         int save = flags;
         root = null;
-        int ch = next();
+        int ch = next(); // 当前字符确定为'('才进入此方法
         if (ch == '?') {
-            ch = skip();
+            ch = skip(); // 读取下一位字符，然后光标再后移一位
             switch (ch) {
                 case ':':   //  (?:xxx) pure group
                     head = createGroup(true);
@@ -1245,9 +1219,8 @@ public final class Pattern {
     }
 
     /**
-     * Create group head and tail nodes using double return. If the group is
-     * created with anonymous true then it is a pure group and should not
-     * affect group counting.
+     * Create group head and tail nodes using double return.
+     * If the group is created with anonymous true then it is a pure group and should not affect group counting.
      */
     private Node createGroup(boolean anonymous) {
         int localIndex = localCount++;
@@ -1278,16 +1251,16 @@ public final class Pattern {
 
     static final int GREEDY = 0;
 
-    static final int LAZY = 1;
+    static final int LAZY = 1; // 表示'？'
 
-    static final int POSSESSIVE = 2;
+    static final int POSSESSIVE = 2; // 表示'+'
 
     static final int INDEPENDENT = 3;
 
     /**
-     * Processes repetition. If the next character peeked is a quantifier
-     * then new nodes must be appended to handle the repetition.
-     * Prev could be a single or a group, so it could be a chain of nodes.
+     * 处理重复规则，如果下一个字符是量词则必须后缀处理重复的新节点，如：'*', '+', '?', '{1，2}'
+     *
+     * @param prev Prev could be a single or a group, so it could be a chain of nodes.
      */
     private Node closure(Node prev) {
         int ch = peek();
@@ -1296,8 +1269,9 @@ public final class Pattern {
                 ch = next();
                 if (ch == '?') {
                     next();
-                    return new Ques(prev, LAZY);
-                } else if (ch == '+') {
+                    return new Ques(prev, LAZY); //
+                }
+                if (ch == '+') {
                     next();
                     return new Ques(prev, POSSESSIVE);
                 }
@@ -1369,7 +1343,7 @@ public final class Pattern {
     /**
      * Utility method for parsing control escape sequences.
      */
-    private int c() {
+    private int controlEscape() {
         if (cursor < patternLength) {
             return read() ^ 64;
         }
@@ -1379,7 +1353,7 @@ public final class Pattern {
     /**
      * Utility method for parsing octal escape sequences.
      */
-    private int o() {
+    private int octalEscape() {
         int n = read();
         if (((n - '0') | ('7' - n)) >= 0) {
             int m = read();
@@ -1400,7 +1374,7 @@ public final class Pattern {
     /**
      * Utility method for parsing hexadecimal escape sequences.
      */
-    private int x() {
+    private int hexadecimalEscape() {
         int n = read();
         if (ASCII.isHexDigit(n)) {
             int m = read();
@@ -1421,17 +1395,6 @@ public final class Pattern {
         throw error("Illegal hexadecimal escape sequence");
     }
 
-    /**
-     * Utility method for parsing unicode escape sequences.
-     */
-    private int cursor() {
-        return cursor;
-    }
-
-    private void setcursor(int pos) {
-        cursor = pos;
-    }
-
     private int uxxxx() {
         int n = 0;
         for (int i = 0; i < 4; i++) {
@@ -1447,13 +1410,13 @@ public final class Pattern {
     private int u() {
         int n = uxxxx();
         if (Character.isHighSurrogate((char) n)) {
-            int cur = cursor();
+            int cur = this.cursor;
             if (read() == '\\' && read() == 'u') {
                 int n2 = uxxxx();
                 if (Character.isLowSurrogate((char) n2))
                     return Character.toCodePoint((char) n, (char) n2);
             }
-            setcursor(cur);
+            this.cursor = cur;
         }
         return n;
     }
@@ -1498,9 +1461,8 @@ public final class Pattern {
     }
 
     /**
-     * Creates a bit vector for matching Latin-1 values. A normal BitClass
-     * never matches values above Latin-1, and a complemented BitClass always
-     * matches values above Latin-1.
+     * Creates a bit vector for matching Latin-1 values.
+     * A normal BitClass never matches values above Latin-1, and a complemented BitClass always matches values above Latin-1.
      */
     private static final class BitClass extends BmpCharProperty {
         final boolean[] bits;
@@ -1521,21 +1483,12 @@ public final class Pattern {
     }
 
     /**
-     * Returns a suitably optimized, single character matcher.
+     * 返回一个经过优化的适当的单字符匹配器，如果是2byte的普通字符则返回{@link Single}，否则返回{@link SingleS}
      */
     private CharProperty newSingle(final int ch) {
         if (isSupplementary(ch))
             return new SingleS(ch);    // Match a given Unicode character
         return new Single(ch);         // Match a given BMP character
-    }
-
-    /**
-     * Utility method for creating a string slice matcher.
-     */
-    private Node newSlice(int[] buf, int count, boolean hasSupplementary) {
-        int[] tmp = new int[count];
-        System.arraycopy(buf, 0, tmp, 0, count);
-        return hasSupplementary ? new SliceS(tmp) : new Slice(tmp);
     }
 
     /*
@@ -1547,9 +1500,7 @@ public final class Pattern {
      */
 
     /**
-     * Base class for all node classes. Subclasses should override the match()
-     * method as appropriate. This class is an accepting node, so its match()
-     * always returns true.
+     * 匹配节点的基类，子类应该根据自己的规则复写match()方法，此类是一个无条件接受的节点，即所有输入都会被接受
      */
     static class Node {
         Node next;
@@ -1559,7 +1510,7 @@ public final class Pattern {
         }
 
         /**
-         * This method implements the classic accept node.
+         * 此方法实现了比较典型的全接受节点
          */
         boolean match(Matcher matcher, int i, CharSequence seq) {
             matcher.last = i;
@@ -1569,7 +1520,7 @@ public final class Pattern {
         }
 
         /**
-         * This method is good for all zero length assertions.
+         * 这种方法适用于所有零长度断言。
          */
         boolean study(TreeInfo info) {
             if (next != null) {
@@ -1582,9 +1533,8 @@ public final class Pattern {
 
     static class LastNode extends Node {
         /**
-         * This method implements the classic accept node with
-         * the addition of a check to see if the match occurred
-         * using all of the input.
+         * This method implements the classic accept node with the addition of a check to see
+         * if the match occurred using all of the input.
          */
         boolean match(Matcher matcher, int i, CharSequence seq) {
             if (matcher.acceptMode == Matcher.ENDANCHOR && i != matcher.to)
@@ -1598,9 +1548,8 @@ public final class Pattern {
 
     /**
      * Used for REs that can start anywhere within the input string.
-     * This basically tries to match repeatedly at each spot in the
-     * input string, moving forward after each try. An anchored search
-     * or a BnM will bypass this node completely.
+     * This basically tries to match repeatedly at each spot in the input string,
+     * moving forward after each try. An anchored search or a BnM will bypass this node completely.
      */
     static class Start extends Node {
         int minLength;
@@ -1638,8 +1587,8 @@ public final class Pattern {
         }
     }
 
-    /*
-     * StartS supports supplementary characters, including unpaired surrogates.
+    /**
+     * StartS支持大于65535的补充字符
      */
     static final class StartS extends Start {
         StartS(Node node) {
@@ -1675,9 +1624,8 @@ public final class Pattern {
     }
 
     /**
-     * Node to anchor at the beginning of input. This object implements the
-     * match for a \A sequence, and the caret anchor will use this if not in
-     * multiline mode.
+     * 锚定输入起始位置的节点
+     * This object implements the match for a \A sequence, and the caret anchor will use this if not in multiline mode.
      */
     static final class Begin extends Node {
         boolean match(Matcher matcher, int i, CharSequence seq) {
@@ -1693,8 +1641,8 @@ public final class Pattern {
     }
 
     /**
-     * Node to anchor at the end of input. This is the absolute end, so this
-     * should not match at the last newline before the end as $ will.
+     * 锚定输入结束位置的节点，
+     * This is the absolute end, so this should not match at the last newline before the end as $ will.
      */
     static final class End extends Node {
         boolean match(Matcher matcher, int i, CharSequence seq) {
@@ -1708,8 +1656,7 @@ public final class Pattern {
     }
 
     /**
-     * Node to match the location where the last match ended.
-     * This is used for the \G construct.
+     * Node to match the location where the last match ended. This is used for the \G construct.
      */
     static final class LastMatch extends Node {
         boolean match(Matcher matcher, int i, CharSequence seq) {
@@ -1821,8 +1768,7 @@ public final class Pattern {
     }
 
     /**
-     * Abstract node class to match one character satisfying some
-     * boolean property.
+     * Abstract node class to match one character satisfying some boolean property.
      */
     private static abstract class CharProperty extends Node {
         abstract boolean isSatisfiedBy(int ch);
@@ -1868,7 +1814,7 @@ public final class Pattern {
     }
 
     /**
-     * Node class that matches a Supplementary Unicode character
+     * 匹配一个超过2byte的字符
      */
     static final class SingleS extends CharProperty {
         final int c;
@@ -1883,7 +1829,7 @@ public final class Pattern {
     }
 
     /**
-     * Optimization -- matches a given BMP character
+     * 匹配一个固定的字符
      */
     static final class Single extends BmpCharProperty {
         final int c;
@@ -2099,7 +2045,8 @@ public final class Pattern {
     }
 
     /**
-     * The 0 or 1 quantifier. This one class implements all three types.
+     * 重复0或1次的量词，等价于正则表达式中的'?'
+     * This one class implements all three types.
      */
     static final class Ques extends Node {
         Node atom;
@@ -2499,11 +2446,11 @@ public final class Pattern {
     }
 
     /**
-     * A Guard node at the end of each atom node in a Branch. It
-     * serves the purpose of chaining the "match" operation to
-     * "next" but not the "study", so we can collect the TreeInfo
-     * of each atom node without including the TreeInfo of the
-     * "next".
+     * 此类表示or分支中每个原子节点的末位的Guard节点，它的目的是将match方法导向next节点而不是study方法。
+     * 从而可以收集到每个原子节点的TreeInfo，同时不包括其next节点的TreeInfo。
+     * A Guard node at the end of each atom node in a Branch.
+     * It serves the purpose of chaining the "match" operation to "next" but not the "study",
+     * so we can collect the TreeInfo of each atom node without including the TreeInfo of the "next".
      */
     static final class BranchConn extends Node {
         boolean match(Matcher matcher, int i, CharSequence seq) {
