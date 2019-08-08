@@ -25,14 +25,6 @@ public final class Pattern {
     public static final int UNIX_LINES = 0x01;
 
     /**
-     * 启用大小写不敏感的匹配模式。
-     * 默认情况下，大小写不敏感匹配只针对US-ASCII字符集的字符生效，
-     * <p>
-     * 此模式也可以通过内嵌表达式`(?i)`启用，且会造成轻微的性能损耗。
-     */
-    public static final int CASE_INSENSITIVE = 0x02;
-
-    /**
      * 启用dotall模式，此模式下，表达式`.`会匹配任何字符包括换行符，而默认情况下它不会匹配到换行符。
      * <p>
      * 可以通过内嵌表达式`(?s)`启用，s等价于single-line的缩写。
@@ -761,10 +753,7 @@ public final class Pattern {
                     break;
             }
         }
-        if (has(CASE_INSENSITIVE))
-            return new CIBackRef(refNum, false);
-        else
-            return new BackRef(refNum);
+        return new BackRef(refNum);
     }
 
     /**
@@ -887,10 +876,7 @@ public final class Pattern {
                 if (!namedGroups().containsKey(name))
                     throw error("(named capturing group <" + name + "> does not exit");
                 if (create) {
-                    if (has(CASE_INSENSITIVE))
-                        root = new CIBackRef(namedGroups().get(name), false);
-                    else
-                        root = new BackRef(namedGroups().get(name));
+                    root = new BackRef(namedGroups().get(name));
                 }
                 return -1;
             case 'l':
@@ -1068,7 +1054,7 @@ public final class Pattern {
               toLowerCase(u+212b) ==> u+00e5
         */
         if (ch < 256) {
-            return bits.add(ch, flags);
+            return bits.add(ch);
         }
         return newSingle(ch);
     }
@@ -1118,10 +1104,7 @@ public final class Pattern {
                     if (m < ch) {
                         throw error("Illegal character range");
                     }
-                    if (has(CASE_INSENSITIVE))
-                        return caseInsensitiveRangeFor(ch, m);
-                    else
-                        return rangeFor(ch, m);
+                    return rangeFor(ch, m);
                 }
             }
             return bitsOrSingle(bits, ch);
@@ -1446,9 +1429,6 @@ public final class Pattern {
         int ch = peek();
         for (; ; ) {
             switch (ch) {
-                case 'i':
-                    flags |= CASE_INSENSITIVE;
-                    break;
                 case 's':
                     flags |= DOTALL;
                     break;
@@ -1473,9 +1453,6 @@ public final class Pattern {
         int ch = peek();
         for (; ; ) {
             switch (ch) {
-                case 'i':
-                    flags &= ~CASE_INSENSITIVE;
-                    break;
                 case 's':
                     flags &= ~DOTALL;
                     break;
@@ -1724,14 +1701,8 @@ public final class Pattern {
             bits = new boolean[256];
         }
 
-        BitClass add(int c, int flags) {
+        BitClass add(int c) {
             assert c >= 0 && c <= 255;
-            if ((flags & CASE_INSENSITIVE) != 0) {
-                if (ASCII.isAscii(c)) {
-                    bits[ASCII.toUpper(c)] = true;
-                    bits[ASCII.toLower(c)] = true;
-                }
-            }
             bits[c] = true;
             return this;
         }
@@ -1745,15 +1716,6 @@ public final class Pattern {
      * Returns a suitably optimized, single character matcher.
      */
     private CharProperty newSingle(final int ch) {
-        if (has(CASE_INSENSITIVE)) {
-            int lower, upper;
-            if (ASCII.isAscii(ch)) {
-                lower = ASCII.toLower(ch);
-                upper = ASCII.toUpper(ch);
-                if (lower != upper)
-                    return new SingleI(lower, upper);
-            }
-        }
         if (isSupplementary(ch))
             return new SingleS(ch);    // Match a given Unicode character
         return new Single(ch);         // Match a given BMP character
@@ -1764,12 +1726,6 @@ public final class Pattern {
      */
     private Node newSlice(int[] buf, int count, boolean hasSupplementary) {
         int[] tmp = new int[count];
-        if (has(CASE_INSENSITIVE)) {
-            for (int i = 0; i < count; i++) {
-                tmp[i] = ASCII.toLower(buf[i]);
-            }
-            return hasSupplementary ? new SliceIS(tmp) : new SliceI(tmp);
-        }
         System.arraycopy(buf, 0, tmp, 0, count);
         return hasSupplementary ? new SliceS(tmp) : new Slice(tmp);
     }
@@ -2177,23 +2133,6 @@ public final class Pattern {
     }
 
     /**
-     * Case insensitive matches a given BMP character
-     */
-    static final class SingleI extends BmpCharProperty {
-        final int lower;
-        final int upper;
-
-        SingleI(int lower, int upper) {
-            this.lower = lower;
-            this.upper = upper;
-        }
-
-        boolean isSatisfiedBy(int ch) {
-            return ch == lower || ch == upper;
-        }
-    }
-
-    /**
      * Node class that matches a Unicode block.
      */
     static final class Block extends CharProperty {
@@ -2331,31 +2270,6 @@ public final class Pattern {
     }
 
     /**
-     * Node class for a case_insensitive/BMP-only sequence of literal
-     * characters.
-     */
-    static class SliceI extends SliceNode {
-        SliceI(int[] buf) {
-            super(buf);
-        }
-
-        boolean match(Matcher matcher, int i, CharSequence seq) {
-            int[] buf = buffer;
-            int len = buf.length;
-            for (int j = 0; j < len; j++) {
-                if ((i + j) >= matcher.to) {
-                    matcher.hitEnd = true;
-                    return false;
-                }
-                int c = seq.charAt(i + j);
-                if (buf[j] != c && buf[j] != ASCII.toLower(c))
-                    return false;
-            }
-            return next.match(matcher, i + len, seq);
-        }
-    }
-
-    /**
      * Node class for a case sensitive sequence of literal characters
      * including supplementary characters.
      */
@@ -2385,40 +2299,6 @@ public final class Pattern {
         }
     }
 
-    /**
-     * Node class for a case insensitive sequence of literal characters
-     * including supplementary characters.
-     */
-    static class SliceIS extends SliceNode {
-        SliceIS(int[] buf) {
-            super(buf);
-        }
-
-        int toLower(int c) {
-            return ASCII.toLower(c);
-        }
-
-        boolean match(Matcher matcher, int i, CharSequence seq) {
-            int[] buf = buffer;
-            int x = i;
-            for (int value : buf) {
-                if (x >= matcher.to) {
-                    matcher.hitEnd = true;
-                    return false;
-                }
-                int c = Character.codePointAt(seq, x);
-                if (value != c && value != toLower(c))
-                    return false;
-                x += Character.charCount(c);
-                if (x > matcher.to) {
-                    matcher.hitEnd = true;
-                    return false;
-                }
-            }
-            return next.match(matcher, x, seq);
-        }
-    }
-
     private static boolean inRange(int lower, int ch, int upper) {
         return lower <= ch && ch <= upper;
     }
@@ -2430,19 +2310,6 @@ public final class Pattern {
         return new CharProperty() {
             boolean isSatisfiedBy(int ch) {
                 return inRange(lower, ch, upper);
-            }
-        };
-    }
-
-    /**
-     * Returns node for matching characters within an explicit value
-     * range in a case insensitive manner.
-     */
-    private CharProperty caseInsensitiveRangeFor(final int lower, final int upper) {
-        return new CharProperty() {
-            boolean isSatisfiedBy(int ch) {
-                return inRange(lower, ch, upper) || ASCII.isAscii(ch)
-                        && (inRange(lower, ASCII.toUpper(ch), upper) || inRange(lower, ASCII.toLower(ch), upper));
             }
         };
     }
@@ -3217,62 +3084,6 @@ public final class Pattern {
             for (int index = 0; index < groupSize; index++)
                 if (seq.charAt(i + index) != seq.charAt(j + index))
                     return false;
-
-            return next.match(matcher, i + groupSize, seq);
-        }
-
-        boolean study(TreeInfo info) {
-            info.maxValid = false;
-            return next.study(info);
-        }
-    }
-
-    static class CIBackRef extends Node {
-        int groupIndex;
-        boolean doUnicodeCase;
-
-        CIBackRef(int groupCount, boolean doUnicodeCase) {
-            super();
-            groupIndex = groupCount + groupCount;
-            this.doUnicodeCase = doUnicodeCase;
-        }
-
-        boolean match(Matcher matcher, int i, CharSequence seq) {
-            int j = matcher.groups[groupIndex];
-            int k = matcher.groups[groupIndex + 1];
-
-            int groupSize = k - j;
-
-            // If the referenced group didn't match, neither can this
-            if (j < 0)
-                return false;
-
-            // If there isn't enough input left no match
-            if (i + groupSize > matcher.to) {
-                matcher.hitEnd = true;
-                return false;
-            }
-
-            // Check each new char to make sure it matches what the group
-            // referenced matched last time around
-            int x = i;
-            for (int index = 0; index < groupSize; index++) {
-                int c1 = Character.codePointAt(seq, x);
-                int c2 = Character.codePointAt(seq, j);
-                if (c1 != c2) {
-                    if (doUnicodeCase) {
-                        int cc1 = Character.toUpperCase(c1);
-                        int cc2 = Character.toUpperCase(c2);
-                        if (cc1 != cc2 && Character.toLowerCase(cc1) != Character.toLowerCase(cc2))
-                            return false;
-                    } else {
-                        if (ASCII.toLower(c1) != ASCII.toLower(c2))
-                            return false;
-                    }
-                }
-                x += Character.charCount(c1);
-                j += Character.charCount(c2);
-            }
 
             return next.match(matcher, i + groupSize, seq);
         }
