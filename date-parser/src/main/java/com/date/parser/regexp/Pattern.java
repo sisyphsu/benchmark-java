@@ -40,15 +40,6 @@ public final class Pattern {
     public static final int COMMENTS = 0x04;
 
     /**
-     * 启用Pattern的字面解析模式，此模式下则整个输入字符串会被视为连续的普通字符串，元字符或逃逸字符等都不会有特殊含义。
-     * <p>
-     * 启用后，CASE_INSENSITIVE与UNICODE_CASE仍然会对匹配产生影响，其他模式都会被覆盖。
-     * <p>
-     * 此模式不能通过内嵌表达式启用
-     */
-    public static final int LITERAL = 0x10;
-
-    /**
      * 启用dotall模式，此模式下，表达式`.`会匹配任何字符包括换行符，而默认情况下它不会匹配到换行符。
      * <p>
      * 可以通过内嵌表达式`(?s)`启用，s等价于single-line的缩写。
@@ -276,28 +267,21 @@ public final class Pattern {
 
         patternLength = count;   // patternLength now in code points
 
-        if (!has(LITERAL))
-            RemoveQEQuoting();
+        RemoveQEQuoting();
 
         // Allocate all temporary objects here.
         buffer = new int[32];
         groupNodes = new GroupHead[10];
         namedGroups = null;
 
-        if (has(LITERAL)) {
-            // Literal pattern handling
-            matchRoot = newSlice(temp, patternLength, hasSupplementary);
-            matchRoot.next = lastAccept;
-        } else {
-            // Start recursive descent parsing
-            matchRoot = expr(lastAccept);
-            // Check extra pattern characters
-            if (patternLength != cursor) {
-                if (peek() == ')') {
-                    throw error("Unmatched closing ')'");
-                } else {
-                    throw error("Unexpected internal error");
-                }
+        // Start recursive descent parsing
+        matchRoot = expr(lastAccept);
+        // Check extra pattern characters
+        if (patternLength != cursor) {
+            if (peek() == ')') {
+                throw error("Unmatched closing ')'");
+            } else {
+                throw error("Unexpected internal error");
             }
         }
 
