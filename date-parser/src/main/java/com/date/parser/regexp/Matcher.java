@@ -138,16 +138,6 @@ public final class Matcher {
     }
 
     /**
-     * Returns the pattern that is interpreted by this matcher.
-     *
-     * @return The pattern for which this matcher was created
-     */
-    public Pattern pattern() {
-        return parentPattern;
-    }
-
-
-    /**
      * Resets this matcher.
      *
      * <p> Resetting a matcher discards all of its explicit state information
@@ -195,82 +185,6 @@ public final class Matcher {
         if (first < 0)
             throw new IllegalStateException("No match available");
         return last;
-    }
-
-    /**
-     * Returns the input subsequence matched by the previous match.
-     *
-     * <p> For a matcher <i>m</i> with input sequence <i>s</i>,
-     * the expressions <i>m.</i><tt>group()</tt> and
-     * <i>s.</i><tt>substring(</tt><i>m.</i><tt>start(),</tt>&nbsp;<i>m.</i><tt>end())</tt>
-     * are equivalent.  </p>
-     *
-     * <p> Note that some patterns, for example <tt>a*</tt>, match the empty
-     * string.  This method will return the empty string when the pattern
-     * successfully matches the empty string in the input.  </p>
-     *
-     * @return The (possibly empty) subsequence matched by the previous match,
-     * in string form
-     * @throws IllegalStateException If no match has yet been attempted,
-     *                               or if the previous match operation failed
-     */
-    public String group() {
-        return group(0);
-    }
-
-    /**
-     * Returns the input subsequence captured by the given group during the
-     * previous match operation.
-     *
-     * <p> For a matcher <i>m</i>, input sequence <i>s</i>, and group index
-     * <i>g</i>, the expressions <i>m.</i><tt>group(</tt><i>g</i><tt>)</tt> and
-     * <i>s.</i><tt>substring(</tt><i>m.</i><tt>start(</tt><i>g</i><tt>),</tt>&nbsp;<i>m.</i><tt>end(</tt><i>g</i><tt>))</tt>
-     * are equivalent.  </p>
-     *
-     * <p> <a href="Pattern.html#cg">Capturing groups</a> are indexed from left
-     * to right, starting at one.  Group zero denotes the entire pattern, so
-     * the expression <tt>m.group(0)</tt> is equivalent to <tt>m.group()</tt>.
-     * </p>
-     *
-     * <p> If the match was successful but the group specified failed to match
-     * any part of the input sequence, then <tt>null</tt> is returned. Note
-     * that some groups, for example <tt>(a*)</tt>, match the empty string.
-     * This method will return the empty string when such a group successfully
-     * matches the empty string in the input.  </p>
-     *
-     * @param group The index of a capturing group in this matcher's pattern
-     * @return The (possibly empty) subsequence captured by the group
-     * during the previous match, or <tt>null</tt> if the group
-     * failed to match part of the input
-     * @throws IllegalStateException     If no match has yet been attempted,
-     *                                   or if the previous match operation failed
-     * @throws IndexOutOfBoundsException If there is no capturing group in the pattern
-     *                                   with the given index
-     */
-    public String group(int group) {
-        if (first < 0)
-            throw new IllegalStateException("No match found");
-        if (group < 0 || group > groupCount())
-            throw new IndexOutOfBoundsException("No group " + group);
-        if ((groups[group * 2] == -1) || (groups[group * 2 + 1] == -1))
-            return null;
-        return getSubSequence(groups[group * 2], groups[group * 2 + 1]).toString();
-    }
-
-    /**
-     * Returns the number of capturing groups in this matcher's pattern.
-     *
-     * <p> Group zero denotes the entire pattern by convention. It is not
-     * included in this count.
-     *
-     * <p> Any non-negative integer smaller than or equal to the value
-     * returned by this method is guaranteed to be a valid group index for
-     * this matcher.  </p>
-     *
-     * @return The number of capturing groups in this matcher's pattern
-     */
-    public int groupCount() {
-        return parentPattern.capturingGroupCount - 1;
     }
 
     /**
@@ -345,54 +259,6 @@ public final class Matcher {
     }
 
     /**
-     * Reports the start index of this matcher's region. The
-     * searches this matcher conducts are limited to finding matches
-     * within {@link #regionStart regionStart} (inclusive) and
-     * {@link #regionEnd regionEnd} (exclusive).
-     *
-     * @return The starting point of this matcher's region
-     * @since 1.5
-     */
-    public int regionStart() {
-        return from;
-    }
-
-    /**
-     * Reports the end index (exclusive) of this matcher's region.
-     * The searches this matcher conducts are limited to finding matches
-     * within {@link #regionStart regionStart} (inclusive) and
-     * {@link #regionEnd regionEnd} (exclusive).
-     *
-     * @return the ending point of this matcher's region
-     * @since 1.5
-     */
-    public int regionEnd() {
-        return to;
-    }
-
-    /**
-     * <p>Returns the string representation of this matcher. The
-     * string representation of a <code>Matcher</code> contains information
-     * that may be useful for debugging. The exact format is unspecified.
-     *
-     * @return The string representation of this matcher
-     * @since 1.5
-     */
-    public String toString() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("java.util.regex.Matcher");
-        sb.append("[pattern=").append(pattern());
-        sb.append(" region=");
-        sb.append(regionStart()).append(",").append(regionEnd());
-        sb.append(" lastmatch=");
-        if ((first >= 0) && (group() != null)) {
-            sb.append(group());
-        }
-        sb.append("]");
-        return sb.toString();
-    }
-
-    /**
      * Initiates a search to find a Pattern within the given bounds.
      * The groups are filled with default values and the match of the root
      * of the state machine is called. The state machine will hold the state
@@ -450,16 +316,5 @@ public final class Matcher {
      */
     int getTextLength() {
         return text.length();
-    }
-
-    /**
-     * Generates a String from this Matcher's input in the specified range.
-     *
-     * @param beginIndex the beginning index, inclusive
-     * @param endIndex   the ending index, exclusive
-     * @return A String generated from this Matcher's input
-     */
-    CharSequence getSubSequence(int beginIndex, int endIndex) {
-        return text.subSequence(beginIndex, endIndex);
     }
 }
