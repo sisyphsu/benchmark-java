@@ -20,11 +20,6 @@ public final class Pattern {
      */
 
     /**
-     * 换行符采用Unix标准即'\n'，换行符只会在[.^$]的模式下被识别并匹配，此模式也可以通过内嵌表达式`(?d)`来启用
-     */
-    public static final int UNIX_LINES = 0x01;
-
-    /**
      * 启用dotall模式，此模式下，表达式`.`会匹配任何字符包括换行符，而默认情况下它不会匹配到换行符。
      * <p>
      * 可以通过内嵌表达式`(?s)`启用，s等价于single-line的缩写。
@@ -567,21 +562,14 @@ public final class Pattern {
                     break;
                 case '$':
                     next();
-                    if (has(UNIX_LINES))
-                        node = new UnixDollar(false);
-                    else
-                        node = new Dollar(false);
+                    node = new Dollar(false);
                     break;
                 case '.':
                     next();
                     if (has(DOTALL)) {
                         node = new All();
                     } else {
-                        if (has(UNIX_LINES))
-                            node = new UnixDot();
-                        else {
-                            node = new Dot();
-                        }
+                        node = new Dot();
                     }
                     break;
                 case '|':
@@ -838,10 +826,7 @@ public final class Pattern {
             case 'Z':
                 if (inclass) break;
                 if (create) {
-                    if (has(UNIX_LINES))
-                        root = new UnixDollar(false);
-                    else
-                        root = new Dollar(false);
+                    root = new Dollar(false);
                 }
                 return -1;
             case 'a':
@@ -1432,9 +1417,6 @@ public final class Pattern {
                 case 's':
                     flags |= DOTALL;
                     break;
-                case 'd':
-                    flags |= UNIX_LINES;
-                    break;
                 case '-': // subFlag then fall through
                     next();
                     subFlag();
@@ -1452,15 +1434,10 @@ public final class Pattern {
     private void subFlag() {
         int ch = peek();
         for (; ; ) {
-            switch (ch) {
-                case 's':
-                    flags &= ~DOTALL;
-                    break;
-                case 'd':
-                    flags &= ~UNIX_LINES;
-                    break;
-                default:
-                    return;
+            if (ch == 's') {
+                flags &= ~DOTALL;
+            } else {
+                return;
             }
             ch = next();
         }
@@ -2330,16 +2307,6 @@ public final class Pattern {
     static final class Dot extends CharProperty {
         boolean isSatisfiedBy(int ch) {
             return (ch != '\n' && ch != '\r' && (ch | 1) != '\u2029' && ch != '\u0085');
-        }
-    }
-
-    /**
-     * Node class for the dot metacharacter when dotall is not enabled
-     * but UNIX_LINES is enabled.
-     */
-    static final class UnixDot extends CharProperty {
-        boolean isSatisfiedBy(int ch) {
-            return ch != '\n';
         }
     }
 
