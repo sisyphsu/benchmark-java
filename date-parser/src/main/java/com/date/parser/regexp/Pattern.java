@@ -2688,8 +2688,7 @@ public final class Pattern {
         boolean match(Matcher matcher, int i, CharSequence seq) {
             int savedFrom = matcher.from;
             boolean conditionMatched = false;
-            int startIndex = (!matcher.transparentBounds) ?
-                    matcher.from : 0;
+            int startIndex = (!matcher.transparentBounds) ? matcher.from : 0;
             int from = Math.max(i - rmax, startIndex);
             // Set end boundary
             int savedLBT = matcher.lookbehindTo;
@@ -2719,8 +2718,7 @@ public final class Pattern {
             int rmaxChars = countChars(seq, i, -rmax);
             int rminChars = countChars(seq, i, -rmin);
             int savedFrom = matcher.from;
-            int startIndex = (!matcher.transparentBounds) ?
-                    matcher.from : 0;
+            int startIndex = (!matcher.transparentBounds) ? matcher.from : 0;
             boolean conditionMatched = false;
             int from = Math.max(i - rmaxChars, startIndex);
             // Set end boundary
@@ -2730,9 +2728,7 @@ public final class Pattern {
             if (matcher.transparentBounds)
                 matcher.from = 0;
 
-            for (int j = i - rminChars;
-                 !conditionMatched && j >= from;
-                 j -= j > from ? countChars(seq, j, -1) : 1) {
+            for (int j = i - rminChars; !conditionMatched && j >= from; j -= j > from ? countChars(seq, j, -1) : 1) {
                 conditionMatched = cond.match(matcher, j, seq);
             }
             matcher.from = savedFrom;
@@ -2758,8 +2754,7 @@ public final class Pattern {
             int savedLBT = matcher.lookbehindTo;
             int savedFrom = matcher.from;
             boolean conditionMatched = false;
-            int startIndex = (!matcher.transparentBounds) ?
-                    matcher.from : 0;
+            int startIndex = (!matcher.transparentBounds) ? matcher.from : 0;
             int from = Math.max(i - rmax, startIndex);
             matcher.lookbehindTo = i;
             // Relax transparent region boundaries for lookbehind
@@ -2863,8 +2858,7 @@ public final class Pattern {
         }
 
         boolean isWord(int ch) {
-            return useUWORD ? UnicodeProp.WORD.is(ch)
-                    : (ch == '_' || Character.isLetterOrDigit(ch));
+            return useUWORD ? UnicodeProp.WORD.is(ch) : (ch == '_' || Character.isLetterOrDigit(ch));
         }
 
         int check(Matcher matcher, int i, CharSequence seq) {
@@ -2878,16 +2872,12 @@ public final class Pattern {
             }
             if (i > startIndex) {
                 ch = Character.codePointBefore(seq, i);
-                left = (isWord(ch) ||
-                        ((Character.getType(ch) == Character.NON_SPACING_MARK)
-                                && hasBaseCharacter(matcher, i - 1, seq)));
+                left = isWord(ch) || ((Character.getType(ch) == Character.NON_SPACING_MARK) && hasBaseCharacter(matcher, i - 1, seq));
             }
             boolean right = false;
             if (i < endIndex) {
                 ch = Character.codePointAt(seq, i);
-                right = (isWord(ch) ||
-                        ((Character.getType(ch) == Character.NON_SPACING_MARK)
-                                && hasBaseCharacter(matcher, i, seq)));
+                right = isWord(ch) || ((Character.getType(ch) == Character.NON_SPACING_MARK) && hasBaseCharacter(matcher, i, seq));
             } else {
                 // Tried to access char past the end
                 matcher.hitEnd = true;
@@ -2906,10 +2896,8 @@ public final class Pattern {
      * Non spacing marks only count as word characters in bounds calculations
      * if they have a base character.
      */
-    private static boolean hasBaseCharacter(Matcher matcher, int i,
-                                            CharSequence seq) {
-        int start = (!matcher.transparentBounds) ?
-                matcher.from : 0;
+    private static boolean hasBaseCharacter(Matcher matcher, int i, CharSequence seq) {
+        int start = (!matcher.transparentBounds) ? matcher.from : 0;
         for (int x = i; x >= start; x--) {
             int ch = Character.codePointAt(seq, x);
             if (Character.isLetterOrDigit(ch))
