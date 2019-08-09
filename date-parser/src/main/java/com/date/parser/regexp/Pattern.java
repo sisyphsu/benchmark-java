@@ -161,44 +161,6 @@ public final class Pattern {
     }
 
     /**
-     * Used to print out a subtree of the Pattern to help with debugging.
-     */
-    public static void printObjectTree(Node node) {
-        while (node != null) {
-            if (node instanceof Prolog) {
-                System.out.println(node);
-                printObjectTree(((Prolog) node).loop);
-                System.out.println("**** end contents prolog loop");
-            } else if (node instanceof Loop) {
-                System.out.println(node);
-                printObjectTree(((Loop) node).body);
-                System.out.println("**** end contents Loop body");
-            } else if (node instanceof Curly) {
-                System.out.println(node);
-                printObjectTree(((Curly) node).atom);
-                System.out.println("**** end contents Curly body");
-            } else if (node instanceof GroupCurly) {
-                System.out.println(node);
-                printObjectTree(((GroupCurly) node).atom);
-                System.out.println("**** end contents GroupCurly body");
-            } else if (node instanceof GroupTail) {
-                System.out.println(node);
-                System.out.println("Tail next is " + node.next);
-                return;
-            } else {
-                System.out.println(node);
-            }
-            node = node.next;
-            if (node != null)
-                System.out.println("->next:");
-            if (node == Pattern.accept) {
-                System.out.println("Accept Node");
-                node = null;
-            }
-        }
-    }
-
-    /**
      * 用于积累子树信息，从而可以针对子树进行优化
      */
     static final class TreeInfo {
@@ -548,18 +510,16 @@ public final class Pattern {
     }
 
     /**
-     * Parses an escape sequence to determine the actual value that needs
-     * to be matched.
-     * If -1 is returned and create was true a new object was added to the tree
-     * to handle the escape sequence.
-     * If the returned value is greater than zero, it is the value that
-     * matches the escape sequence.
+     * 解析一个转义字符以决定它需要匹配的真实值.
+     * 返回当前输入的转义字符，如果返回值小于0说明当前转义字符匹配到了特殊的规则，如'\w' '\d'等
+     *
+     * @param create 匹配到转义符后是否往tree中增加新匹配节点，如'\w' '\d'等
      */
     private int escape(boolean inclass, boolean create, boolean isrange) {
-        int ch = skip();
+        int ch = skip(); // 当前字符为'\', 忽略它并取下一位
         switch (ch) {
             case '0':
-                return octalEscape();
+                return octalEscape(); // 读取八进制，如'\077'转义为'?'
             case '1':
             case '2':
             case '3':
@@ -569,18 +529,23 @@ public final class Pattern {
             case '7':
             case '8':
             case '9':
-                if (inclass) break;
+                if (inclass)
+                    break;
                 if (create) {
                     root = ref((ch - '0'));
                 }
                 return -1;
             case 'A':
-                if (inclass) break;
-                if (create) root = new Begin();
+                if (inclass)
+                    break;
+                if (create)
+                    root = new Begin(); // '\A' matches the start of the input
                 return -1;
             case 'B':
-                if (inclass) break;
-                if (create) root = new Bound(Bound.NONE, false);
+                if (inclass)
+                    break;
+                if (create)
+                    root = new Bound(Bound.NONE, false);
                 return -1;
             case 'C':
             case 'E':
@@ -609,30 +574,38 @@ public final class Pattern {
             case 'y':
                 break;
             case 'D':
-                if (create) root = new Ctype(ASCII.DIGIT).complement();
+                if (create)
+                    root = new Ctype(ASCII.DIGIT).complement();
                 return -1;
             case 'G':
                 if (inclass) break;
-                if (create) root = new LastMatch();
+                if (create)
+                    root = new LastMatch();
                 return -1;
             case 'H':
-                if (create) root = new HorizWS().complement();
+                if (create)
+                    root = new HorizWS().complement();
                 return -1;
             case 'R':
                 if (inclass) break;
-                if (create) root = new LineEnding();
+                if (create)
+                    root = new LineEnding();
                 return -1;
             case 'S':
-                if (create) root = new Ctype(ASCII.SPACE).complement();
+                if (create)
+                    root = new Ctype(ASCII.SPACE).complement();
                 return -1;
             case 'V':
-                if (create) root = new VertWS().complement();
+                if (create)
+                    root = new VerticalWhiteSpace().complement();
                 return -1;
             case 'W':
-                if (create) root = new Ctype(ASCII.WORD).complement();
+                if (create)
+                    root = new Ctype(ASCII.WORD).complement();
                 return -1;
             case 'Z':
-                if (inclass) break;
+                if (inclass)
+                    break;
                 if (create) {
                     root = new Dollar(false);
                 }
@@ -640,20 +613,24 @@ public final class Pattern {
             case 'a':
                 return '\007';
             case 'b':
-                if (inclass) break;
-                if (create) root = new Bound(Bound.BOTH, false);
+                if (inclass)
+                    break;
+                if (create)
+                    root = new Bound(Bound.BOTH, false);
                 return -1;
             case 'c':
                 return controlEscape();
             case 'd':
-                if (create) root = new Ctype(ASCII.DIGIT);
+                if (create)
+                    root = new Ctype(ASCII.DIGIT);
                 return -1;
             case 'e':
                 return '\033';
             case 'f':
                 return '\f';
             case 'h':
-                if (create) root = new HorizWS();
+                if (create)
+                    root = new HorizWS();
                 return -1;
             case 'k':
                 if (inclass)
@@ -672,33 +649,37 @@ public final class Pattern {
             case 'r':
                 return '\r';
             case 's':
-                if (create) root = new Ctype(ASCII.SPACE);
+                if (create)
+                    root = new Ctype(ASCII.SPACE);
                 return -1;
             case 't':
                 return '\t';
             case 'u':
                 return u();
             case 'v':
-                // '\v' was implemented as VT/0x0B in releases < 1.8 (though
-                // undocumented). In JDK8 '\v' is specified as a predefined
-                // character class for all vertical whitespace characters.
-                // So [-1, root=VertWS node] pair is returned (instead of a
-                // single 0x0B). This breaks the range if '\v' is used as
-                // the start or end value, such as [\v-...] or [...-\v], in
-                // which a single definite value (0x0B) is expected. For
-                // compatibility concern '\013'/0x0B is returned if isrange.
+                // '\v'匹配垂直的空白字符，如'\n'
+                // '\v' was implemented as VT/0x0B in releases < 1.8 (though  undocumented).
+                // In JDK8 '\v' is specified as a predefined character class for all vertical whitespace characters.
+                // So [-1, root=VertWS node] pair is returned (instead of a single 0x0B).
+                // This breaks the range if '\v' is used as the start or end value, such as [\v-...] or [...-\v],
+                // in which a single definite value (0x0B) is expected.
+                // For compatibility concern '\013'/0x0B is returned if isrange.
                 if (isrange)
                     return '\013';
-                if (create) root = new VertWS();
+                if (create)
+                    root = new VerticalWhiteSpace();
                 return -1;
             case 'w':
-                if (create) root = new Ctype(ASCII.WORD);
+                if (create)
+                    root = new Ctype(ASCII.WORD);
                 return -1;
             case 'x':
                 return hexadecimalEscape();
             case 'z':
-                if (inclass) break;
-                if (create) root = new End();
+                if (inclass)
+                    break;
+                if (create)
+                    root = new End();
                 return -1;
             default:
                 return ch;
@@ -709,14 +690,15 @@ public final class Pattern {
     /**
      * Parse a character class, and return the node that matches it.
      * <p>
-     * Consumes a ] on the way out if consume is true. Usually consume
-     * is true except for the case of [abc&&def] where def is a separate
-     * right hand node with "understood" brackets.
+     * Consumes a ] on the way out if consume is true.
+     * Usually consume is true except for the case of [abc&&def]
+     * where def is a separate right hand node with "understood" brackets.
+     *
+     * @param consume 通常情况下它都是true，除了[abc&&def]
      */
     private CharProperty clazz(boolean consume) {
         CharProperty prev = null;
-        CharProperty node = null;
-        BitClass bits = new BitClass();
+        CharProperty node;
         boolean include = true;
         boolean firstInClass = true;
         int ch = next();
@@ -743,40 +725,6 @@ public final class Pattern {
                         prev = union(prev, node);
                     ch = peek();
                     continue;
-                case '&':
-                    firstInClass = false;
-                    ch = next();
-                    if (ch == '&') {
-                        ch = next();
-                        CharProperty rightNode = null;
-                        while (ch != ']' && ch != '&') {
-                            if (ch == '[') {
-                                if (rightNode == null)
-                                    rightNode = clazz(true);
-                                else
-                                    rightNode = union(rightNode, clazz(true));
-                            } else { // abc&&def
-                                unread();
-                                rightNode = clazz(false);
-                            }
-                            ch = peek();
-                        }
-                        if (rightNode != null)
-                            node = rightNode;
-                        if (prev == null) {
-                            if (rightNode == null)
-                                throw error("Bad class syntax");
-                            else
-                                prev = rightNode;
-                        } else {
-                            prev = intersection(prev, node);
-                        }
-                    } else {
-                        // treat as a literal &
-                        unread();
-                        break;
-                    }
-                    continue;
                 case 0:
                     firstInClass = false;
                     if (cursor >= patternLength)
@@ -794,7 +742,7 @@ public final class Pattern {
                     firstInClass = false;
                     break;
             }
-            node = range(bits);
+            node = range(new BitClass());
             if (include) {
                 if (prev == null) {
                     prev = node;
@@ -845,7 +793,7 @@ public final class Pattern {
         int ch = peek();
         if (ch == '\\') {
             next();
-            boolean isrange = temp[cursor + 1] == '-';
+            boolean isrange = (temp[cursor + 1] == '-');
             unread();
             ch = escape(true, true, isrange);
             if (ch == -1)
@@ -1189,7 +1137,7 @@ public final class Pattern {
     }
 
     /**
-     * Utility method for parsing octal escape sequences.
+     * 解析八进制转义符的工具方法，读取连续的1~3个八进制数字并返回其真实值
      */
     private int octalEscape() {
         int n = read();
@@ -1299,8 +1247,7 @@ public final class Pattern {
     }
 
     /**
-     * Creates a bit vector for matching Latin-1 values.
-     * A normal BitClass never matches values above Latin-1, and a complemented BitClass always matches values above Latin-1.
+     * 用于匹配拉丁字母(0-255)的bit数组，通过boolean[256]高效地标记可匹配的字母。
      */
     private static final class BitClass extends BmpCharProperty {
         final boolean[] bits;
@@ -1611,6 +1558,9 @@ public final class Pattern {
     private static abstract class CharProperty extends Node {
         abstract boolean isSatisfiedBy(int ch);
 
+        /**
+         * 当前节点的反义节点
+         */
         CharProperty complement() {
             return new CharProperty() {
                 boolean isSatisfiedBy(int ch) {
@@ -1697,9 +1647,9 @@ public final class Pattern {
     }
 
     /**
-     * Node class that matches a Perl vertical whitespace
+     * 匹配垂直空白字符的节点，即'\n'
      */
-    static final class VertWS extends BmpCharProperty {
+    static final class VerticalWhiteSpace extends BmpCharProperty {
         boolean isSatisfiedBy(int cp) {
             return (cp >= 0x0A && cp <= 0x0D) || cp == 0x85 || cp == 0x2028 || cp == 0x2029;
         }
@@ -2811,17 +2761,6 @@ public final class Pattern {
         return new CharProperty() {
             boolean isSatisfiedBy(int ch) {
                 return lhs.isSatisfiedBy(ch) || rhs.isSatisfiedBy(ch);
-            }
-        };
-    }
-
-    /**
-     * Returns the set intersection of two CharProperty nodes.
-     */
-    private static CharProperty intersection(final CharProperty lhs, final CharProperty rhs) {
-        return new CharProperty() {
-            boolean isSatisfiedBy(int ch) {
-                return lhs.isSatisfiedBy(ch) && rhs.isSatisfiedBy(ch);
             }
         };
     }
