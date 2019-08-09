@@ -1,7 +1,6 @@
 package com.date.parser.regexp;
 
 import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
 
 public final class Pattern {
@@ -49,13 +48,6 @@ public final class Pattern {
      * Holds the length of the pattern string.
      */
     private transient int patternLength;
-    /**
-     * If the Start node might possibly match supplementary characters.
-     * It is set to true during compiling if
-     * (1) There is supplementary char in pattern, or
-     * (2) There is complement node of Category or Block
-     */
-    private transient boolean hasSupplementary;
 
     /**
      * 采用默认的模式编译给定的正则表达式，并生成Pattern实例。
@@ -108,7 +100,13 @@ public final class Pattern {
 
         temp = new int[patternLength + 2]; // 复制为int数组，使用00表示结束
 
-        hasSupplementary = false;
+        /*
+         * If the Start node might possibly match supplementary characters.
+         * It is set to true during compiling if
+         * (1) There is supplementary char in pattern, or
+         * (2) There is complement node of Category or Block
+         */
+        boolean hasSupplementary = false;
         int c, count = 0;
         // Convert all chars into code points
         for (int x = 0; x < patternLength; x += Character.charCount(c)) {
@@ -231,13 +229,6 @@ public final class Pattern {
         if (ch != testChar) {
             throw error(msg);
         }
-    }
-
-    /**
-     * 使用指定字符标记pattern的结尾
-     */
-    private void mark(int c) {
-        temp[patternLength] = c;
     }
 
     /**
@@ -381,21 +372,9 @@ public final class Pattern {
                     node = clazz(true);
                     break;
                 case '\\':
-                    ch = next();
-                    if (ch == 'p' || ch == 'P') {
-                        boolean oneLetter = true;
-                        boolean comp = (ch == 'P');
-                        ch = next(); // Consume { if present
-                        if (ch != '{') {
-                            unread();
-                        } else {
-                            oneLetter = false;
-                        }
-                        node = family(oneLetter, comp);
-                    } else {
-                        unread();
-                        node = atom();
-                    }
+                    next();
+                    unread();
+                    node = atom();
                     break;
                 case '^':
                     next();
@@ -476,22 +455,7 @@ public final class Pattern {
                 case ')':
                     break;
                 case '\\':
-                    ch = next();
-                    if (ch == 'p' || ch == 'P') { // Property
-                        if (first > 0) { // Slice is waiting; handle it first
-                            unread();
-                            break;
-                        } else { // No slice; just return the family node
-                            boolean comp = (ch == 'P');
-                            boolean oneLetter = true;
-                            ch = next(); // Consume { if present
-                            if (ch != '{')
-                                unread();
-                            else
-                                oneLetter = false;
-                            return family(oneLetter, comp);
-                        }
-                    }
+                    next();
                     unread();
                     prev = cursor;
                     ch = escape(false, first == 0, false);
@@ -880,24 +844,12 @@ public final class Pattern {
     private CharProperty range(BitClass bits) {
         int ch = peek();
         if (ch == '\\') {
-            ch = next();
-            if (ch == 'p' || ch == 'P') { // A property
-                boolean comp = (ch == 'P');
-                boolean oneLetter = true;
-                // Consume { if present
-                ch = next();
-                if (ch != '{')
-                    unread();
-                else
-                    oneLetter = false;
-                return family(oneLetter, comp);
-            } else { // ordinary escape
-                boolean isrange = temp[cursor + 1] == '-';
-                unread();
-                ch = escape(true, true, isrange);
-                if (ch == -1)
-                    return (CharProperty) root;
-            }
+            next();
+            boolean isrange = temp[cursor + 1] == '-';
+            unread();
+            ch = escape(true, true, isrange);
+            if (ch == -1)
+                return (CharProperty) root;
         } else {
             next();
         }
@@ -924,120 +876,6 @@ public final class Pattern {
             return bitsOrSingle(bits, ch);
         }
         throw error("Unexpected character '" + ((char) ch) + "'");
-    }
-
-    /**
-     * Parses a Unicode character family and returns its representative node.
-     */
-    private CharProperty family(boolean singleLetter, boolean maybeComplement) {
-        next();
-        String name;
-        CharProperty node = null;
-
-        if (singleLetter) {
-            int c = temp[cursor];
-            if (!Character.isSupplementaryCodePoint(c)) {
-                name = String.valueOf((char) c);
-            } else {
-                name = new String(temp, cursor, 1);
-            }
-            read();
-        } else {
-            int i = cursor;
-            mark('}');
-            while (read() != '}') ;
-            mark('\000');
-            int j = cursor;
-            if (j > patternLength)
-                throw error("Unclosed character family");
-            if (i + 1 >= j)
-                throw error("Empty character family");
-            name = new String(temp, i, j - i - 1);
-        }
-
-        int i = name.indexOf('=');
-        if (i != -1) {
-            // property construct \p{name=value}
-            String value = name.substring(i + 1);
-            name = name.substring(0, i).toLowerCase(Locale.ENGLISH);
-            switch (name) {
-                case "sc":
-                case "script":
-                    node = unicodeScriptPropertyFor(value);
-                    break;
-                case "blk":
-                case "block":
-                    node = unicodeBlockPropertyFor(value);
-                    break;
-                case "gc":
-                case "general_category":
-                    node = charPropertyNodeFor(value);
-                    break;
-                default:
-                    throw error("Unknown Unicode property {name=<" + name + ">, value=<" + value + ">}");
-            }
-        } else {
-            if (name.startsWith("In")) {
-                // \p{inBlockName}
-                node = unicodeBlockPropertyFor(name.substring(2));
-            } else if (name.startsWith("Is")) {
-                // \p{isGeneralCategory} and \p{isScriptName}
-                name = name.substring(2);
-                UnicodeProp uprop = UnicodeProp.forName(name);
-                if (uprop != null)
-                    node = new Utype(uprop);
-                if (node == null)
-                    node = CharPropertyNames.charPropertyFor(name);
-                if (node == null)
-                    node = unicodeScriptPropertyFor(name);
-            } else {
-                node = charPropertyNodeFor(name);
-            }
-        }
-        if (maybeComplement) {
-            if (node instanceof Category || node instanceof Block)
-                hasSupplementary = true;
-            node = node.complement();
-        }
-        return node;
-    }
-
-
-    /**
-     * Returns a CharProperty matching all characters belong to
-     * a UnicodeScript.
-     */
-    private CharProperty unicodeScriptPropertyFor(String name) {
-        final Character.UnicodeScript script;
-        try {
-            script = Character.UnicodeScript.forName(name);
-        } catch (IllegalArgumentException iae) {
-            throw error("Unknown character script name {" + name + "}");
-        }
-        return new Script(script);
-    }
-
-    /**
-     * Returns a CharProperty matching all characters in a UnicodeBlock.
-     */
-    private CharProperty unicodeBlockPropertyFor(String name) {
-        final Character.UnicodeBlock block;
-        try {
-            block = Character.UnicodeBlock.forName(name);
-        } catch (IllegalArgumentException iae) {
-            throw error("Unknown character block name {" + name + "}");
-        }
-        return new Block(block);
-    }
-
-    /**
-     * Returns a CharProperty matching all characters in a named property.
-     */
-    private CharProperty charPropertyNodeFor(String name) {
-        CharProperty p = CharPropertyNames.charPropertyFor(name);
-        if (p == null)
-            throw error("Unknown character property name {" + name + "}");
-        return p;
     }
 
     /**
@@ -1768,15 +1606,15 @@ public final class Pattern {
     }
 
     /**
-     * Abstract node class to match one character satisfying some boolean property.
+     * 匹配一定规则的单字符的基类
      */
     private static abstract class CharProperty extends Node {
         abstract boolean isSatisfiedBy(int ch);
 
         CharProperty complement() {
-            return new Pattern.CharProperty() {
+            return new CharProperty() {
                 boolean isSatisfiedBy(int ch) {
-                    return !Pattern.CharProperty.this.isSatisfiedBy(ch);
+                    return !CharProperty.this.isSatisfiedBy(ch);
                 }
             };
         }
@@ -1840,66 +1678,6 @@ public final class Pattern {
 
         boolean isSatisfiedBy(int ch) {
             return ch == c;
-        }
-    }
-
-    /**
-     * Node class that matches a Unicode block.
-     */
-    static final class Block extends CharProperty {
-        final Character.UnicodeBlock block;
-
-        Block(Character.UnicodeBlock block) {
-            this.block = block;
-        }
-
-        boolean isSatisfiedBy(int ch) {
-            return block == Character.UnicodeBlock.of(ch);
-        }
-    }
-
-    /**
-     * Node class that matches a Unicode script
-     */
-    static final class Script extends CharProperty {
-        final Character.UnicodeScript script;
-
-        Script(Character.UnicodeScript script) {
-            this.script = script;
-        }
-
-        boolean isSatisfiedBy(int ch) {
-            return script == Character.UnicodeScript.of(ch);
-        }
-    }
-
-    /**
-     * Node class that matches a Unicode category.
-     */
-    static final class Category extends CharProperty {
-        final int typeMask;
-
-        Category(int typeMask) {
-            this.typeMask = typeMask;
-        }
-
-        boolean isSatisfiedBy(int ch) {
-            return (typeMask & (1 << Character.getType(ch))) != 0;
-        }
-    }
-
-    /**
-     * Node class that matches a Unicode "type"
-     */
-    static final class Utype extends CharProperty {
-        final UnicodeProp uprop;
-
-        Utype(UnicodeProp uprop) {
-            this.uprop = uprop;
-        }
-
-        boolean isSatisfiedBy(int ch) {
-            return uprop.is(ch);
         }
     }
 
@@ -2023,16 +1801,6 @@ public final class Pattern {
                 return inRange(lower, ch, upper);
             }
         };
-    }
-
-    /**
-     * Implements the Unicode category ALL and the dot metacharacter when
-     * in dotall mode.
-     */
-    static final class All extends CharProperty {
-        boolean isSatisfiedBy(int ch) {
-            return true;
-        }
     }
 
     /**
@@ -3300,248 +3068,5 @@ public final class Pattern {
     static Node accept = new Node();
 
     static Node lastAccept = new LastNode();
-
-    private static class CharPropertyNames {
-
-        static CharProperty charPropertyFor(String name) {
-            CharPropertyFactory m = map.get(name);
-            return m == null ? null : m.make();
-        }
-
-        private static abstract class CharPropertyFactory {
-            abstract CharProperty make();
-        }
-
-        private static void defCategory(String name, final int typeMask) {
-            map.put(name, new CharPropertyFactory() {
-                CharProperty make() {
-                    return new Category(typeMask);
-                }
-            });
-        }
-
-        private static void defRange(String name, final int lower, final int upper) {
-            map.put(name, new CharPropertyFactory() {
-                CharProperty make() {
-                    return rangeFor(lower, upper);
-                }
-            });
-        }
-
-        private static void defCtype(String name, final int ctype) {
-            map.put(name, new CharPropertyFactory() {
-                CharProperty make() {
-                    return new Ctype(ctype);
-                }
-            });
-        }
-
-        private static abstract class CloneableProperty extends CharProperty implements Cloneable {
-            public CloneableProperty clone() {
-                try {
-                    return (CloneableProperty) super.clone();
-                } catch (CloneNotSupportedException e) {
-                    throw new AssertionError(e);
-                }
-            }
-        }
-
-        private static void defClone(String name, final CloneableProperty p) {
-            map.put(name, new CharPropertyFactory() {
-                CharProperty make() {
-                    return p.clone();
-                }
-            });
-        }
-
-        private static final HashMap<String, CharPropertyFactory> map = new HashMap<>();
-
-        static {
-            // Unicode character property aliases, defined in
-            // http://www.unicode.org/Public/UNIDATA/PropertyValueAliases.txt
-            defCategory("Cn", 1 << Character.UNASSIGNED);
-            defCategory("Lu", 1 << Character.UPPERCASE_LETTER);
-            defCategory("Ll", 1 << Character.LOWERCASE_LETTER);
-            defCategory("Lt", 1 << Character.TITLECASE_LETTER);
-            defCategory("Lm", 1 << Character.MODIFIER_LETTER);
-            defCategory("Lo", 1 << Character.OTHER_LETTER);
-            defCategory("Mn", 1 << Character.NON_SPACING_MARK);
-            defCategory("Me", 1 << Character.ENCLOSING_MARK);
-            defCategory("Mc", 1 << Character.COMBINING_SPACING_MARK);
-            defCategory("Nd", 1 << Character.DECIMAL_DIGIT_NUMBER);
-            defCategory("Nl", 1 << Character.LETTER_NUMBER);
-            defCategory("No", 1 << Character.OTHER_NUMBER);
-            defCategory("Zs", 1 << Character.SPACE_SEPARATOR);
-            defCategory("Zl", 1 << Character.LINE_SEPARATOR);
-            defCategory("Zp", 1 << Character.PARAGRAPH_SEPARATOR);
-            defCategory("Cc", 1 << Character.CONTROL);
-            defCategory("Cf", 1 << Character.FORMAT);
-            defCategory("Co", 1 << Character.PRIVATE_USE);
-            defCategory("Cs", 1 << Character.SURROGATE);
-            defCategory("Pd", 1 << Character.DASH_PUNCTUATION);
-            defCategory("Ps", 1 << Character.START_PUNCTUATION);
-            defCategory("Pe", 1 << Character.END_PUNCTUATION);
-            defCategory("Pc", 1 << Character.CONNECTOR_PUNCTUATION);
-            defCategory("Po", 1 << Character.OTHER_PUNCTUATION);
-            defCategory("Sm", 1 << Character.MATH_SYMBOL);
-            defCategory("Sc", 1 << Character.CURRENCY_SYMBOL);
-            defCategory("Sk", 1 << Character.MODIFIER_SYMBOL);
-            defCategory("So", 1 << Character.OTHER_SYMBOL);
-            defCategory("Pi", 1 << Character.INITIAL_QUOTE_PUNCTUATION);
-            defCategory("Pf", 1 << Character.FINAL_QUOTE_PUNCTUATION);
-            defCategory("L", ((1 << Character.UPPERCASE_LETTER) |
-                    (1 << Character.LOWERCASE_LETTER) |
-                    (1 << Character.TITLECASE_LETTER) |
-                    (1 << Character.MODIFIER_LETTER) |
-                    (1 << Character.OTHER_LETTER)));
-            defCategory("M", ((1 << Character.NON_SPACING_MARK) |
-                    (1 << Character.ENCLOSING_MARK) |
-                    (1 << Character.COMBINING_SPACING_MARK)));
-            defCategory("N", ((1 << Character.DECIMAL_DIGIT_NUMBER) |
-                    (1 << Character.LETTER_NUMBER) |
-                    (1 << Character.OTHER_NUMBER)));
-            defCategory("Z", ((1 << Character.SPACE_SEPARATOR) |
-                    (1 << Character.LINE_SEPARATOR) |
-                    (1 << Character.PARAGRAPH_SEPARATOR)));
-            defCategory("C", ((1 << Character.CONTROL) |
-                    (1 << Character.FORMAT) |
-                    (1 << Character.PRIVATE_USE) |
-                    (1 << Character.SURROGATE))); // Other
-            defCategory("P", ((1 << Character.DASH_PUNCTUATION) |
-                    (1 << Character.START_PUNCTUATION) |
-                    (1 << Character.END_PUNCTUATION) |
-                    (1 << Character.CONNECTOR_PUNCTUATION) |
-                    (1 << Character.OTHER_PUNCTUATION) |
-                    (1 << Character.INITIAL_QUOTE_PUNCTUATION) |
-                    (1 << Character.FINAL_QUOTE_PUNCTUATION)));
-            defCategory("S", ((1 << Character.MATH_SYMBOL) |
-                    (1 << Character.CURRENCY_SYMBOL) |
-                    (1 << Character.MODIFIER_SYMBOL) |
-                    (1 << Character.OTHER_SYMBOL)));
-            defCategory("LC", ((1 << Character.UPPERCASE_LETTER) |
-                    (1 << Character.LOWERCASE_LETTER) |
-                    (1 << Character.TITLECASE_LETTER)));
-            defCategory("LD", ((1 << Character.UPPERCASE_LETTER) |
-                    (1 << Character.LOWERCASE_LETTER) |
-                    (1 << Character.TITLECASE_LETTER) |
-                    (1 << Character.MODIFIER_LETTER) |
-                    (1 << Character.OTHER_LETTER) |
-                    (1 << Character.DECIMAL_DIGIT_NUMBER)));
-            defRange("L1", 0x00, 0xFF); // Latin-1
-            map.put("all", new CharPropertyFactory() {
-                CharProperty make() {
-                    return new All();
-                }
-            });
-
-            // Posix regular expression character classes, defined in
-            // http://www.unix.org/onlinepubs/009695399/basedefs/xbd_chap09.html
-            defRange("ASCII", 0x00, 0x7F);   // ASCII
-            defCtype("Alnum", ASCII.ALNUM);  // Alphanumeric characters
-            defCtype("Alpha", ASCII.ALPHA);  // Alphabetic characters
-            defCtype("Blank", ASCII.BLANK);  // Space and tab characters
-            defCtype("Cntrl", ASCII.CNTRL);  // Control characters
-            defRange("Digit", '0', '9');     // Numeric characters
-            defCtype("Graph", ASCII.GRAPH);  // printable and visible
-            defRange("Lower", 'a', 'z');     // Lower-case alphabetic
-            defRange("Print", 0x20, 0x7E);   // Printable characters
-            defCtype("Punct", ASCII.PUNCT);  // Punctuation characters
-            defCtype("Space", ASCII.SPACE);  // Space characters
-            defRange("Upper", 'A', 'Z');     // Upper-case alphabetic
-            defCtype("XDigit", ASCII.XDIGIT); // hexadecimal digits
-
-            // Java character properties, defined by methods in Character.java
-            defClone("javaLowerCase", new CloneableProperty() {
-                boolean isSatisfiedBy(int ch) {
-                    return Character.isLowerCase(ch);
-                }
-            });
-            defClone("javaUpperCase", new CloneableProperty() {
-                boolean isSatisfiedBy(int ch) {
-                    return Character.isUpperCase(ch);
-                }
-            });
-            defClone("javaAlphabetic", new CloneableProperty() {
-                boolean isSatisfiedBy(int ch) {
-                    return Character.isAlphabetic(ch);
-                }
-            });
-            defClone("javaIdeographic", new CloneableProperty() {
-                boolean isSatisfiedBy(int ch) {
-                    return Character.isIdeographic(ch);
-                }
-            });
-            defClone("javaTitleCase", new CloneableProperty() {
-                boolean isSatisfiedBy(int ch) {
-                    return Character.isTitleCase(ch);
-                }
-            });
-            defClone("javaDigit", new CloneableProperty() {
-                boolean isSatisfiedBy(int ch) {
-                    return Character.isDigit(ch);
-                }
-            });
-            defClone("javaDefined", new CloneableProperty() {
-                boolean isSatisfiedBy(int ch) {
-                    return Character.isDefined(ch);
-                }
-            });
-            defClone("javaLetter", new CloneableProperty() {
-                boolean isSatisfiedBy(int ch) {
-                    return Character.isLetter(ch);
-                }
-            });
-            defClone("javaLetterOrDigit", new CloneableProperty() {
-                boolean isSatisfiedBy(int ch) {
-                    return Character.isLetterOrDigit(ch);
-                }
-            });
-            defClone("javaJavaIdentifierStart", new CloneableProperty() {
-                boolean isSatisfiedBy(int ch) {
-                    return Character.isJavaIdentifierStart(ch);
-                }
-            });
-            defClone("javaJavaIdentifierPart", new CloneableProperty() {
-                boolean isSatisfiedBy(int ch) {
-                    return Character.isJavaIdentifierPart(ch);
-                }
-            });
-            defClone("javaUnicodeIdentifierStart", new CloneableProperty() {
-                boolean isSatisfiedBy(int ch) {
-                    return Character.isUnicodeIdentifierStart(ch);
-                }
-            });
-            defClone("javaUnicodeIdentifierPart", new CloneableProperty() {
-                boolean isSatisfiedBy(int ch) {
-                    return Character.isUnicodeIdentifierPart(ch);
-                }
-            });
-            defClone("javaIdentifierIgnorable", new CloneableProperty() {
-                boolean isSatisfiedBy(int ch) {
-                    return Character.isIdentifierIgnorable(ch);
-                }
-            });
-            defClone("javaSpaceChar", new CloneableProperty() {
-                boolean isSatisfiedBy(int ch) {
-                    return Character.isSpaceChar(ch);
-                }
-            });
-            defClone("javaWhitespace", new CloneableProperty() {
-                boolean isSatisfiedBy(int ch) {
-                    return Character.isWhitespace(ch);
-                }
-            });
-            defClone("javaISOControl", new CloneableProperty() {
-                boolean isSatisfiedBy(int ch) {
-                    return Character.isISOControl(ch);
-                }
-            });
-            defClone("javaMirrored", new CloneableProperty() {
-                boolean isSatisfiedBy(int ch) {
-                    return Character.isMirrored(ch);
-                }
-            });
-        }
-    }
 
 }

@@ -14,7 +14,7 @@ public class PatternTest {
         System.out.println(ptn);
 
         System.out.println(ptn.matcher("").matches());
-        System.out.println(ptn.matcher("123afsdfsdsdf").matches());
+        System.out.println(ptn.matcher("123a1fsdfsdsdf").matches());
 
         System.out.println(Pattern.matches("\\d+", "123456"));
     }
