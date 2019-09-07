@@ -1,6 +1,5 @@
 package com.github.sisyphsu.benchmark.lang;
 
-import lombok.extern.slf4j.Slf4j;
 import org.openjdk.jmh.annotations.*;
 
 import java.util.concurrent.TimeUnit;
@@ -17,12 +16,16 @@ import java.util.concurrent.TimeUnit;
 @Fork(3)
 @Measurement(iterations = 3, time = 3)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
-@Slf4j
 public class TimestampBenchmark {
 
     @Benchmark
     public void now() {
         System.currentTimeMillis();
+    }
+
+    @Benchmark
+    public void now2() {
+        this.now();
     }
 
 }

@@ -510,10 +510,89 @@ public final class Pattern {
     }
 
     /**
+     * 字符集[]内部的转义符解析，即'\'后缀的字符解析，如'\d'等在[]仍然保留其原有含义
+     *
+     * @param create  是否创建新节点
+     * @param isRange 是否为范围匹配？？？
+     * @return -1表示已创建新的匹配节点
+     */
+    private int clazzEscape(boolean create, boolean isRange) {
+        int ch = skip(); // 当前字符为'\', 忽略它并取下一位
+        switch (ch) {
+            case 'd':
+                if (create) root = new Ctype(ASCII.DIGIT);
+                return -1;
+            case 'D':
+                if (create) root = new Ctype(ASCII.DIGIT).complement();
+                return -1;
+            case 'h':
+                if (create) root = new HorizontalWhiteSpace();
+                return -1;
+            case 'H':
+                if (create) root = new HorizontalWhiteSpace().complement();
+                return -1;
+            case 's':
+                if (create) root = new Ctype(ASCII.SPACE);
+                return -1;
+            case 'S':
+                if (create) root = new Ctype(ASCII.SPACE).complement();
+                return -1;
+            case 'v':
+                // '\v'匹配垂直的空白字符，如'\n'及垂直tab(ascii码为0x0B, VT)
+                // '\v' was implemented as VT/0x0B in releases < 1.8 (though  undocumented).
+                // In JDK8 '\v' is specified as a predefined character class for all vertical whitespace characters.
+                // So [-1, root=VerticalWhiteSpace node] pair is returned (instead of a single 0x0B).
+                // This breaks the range if '\v' is used as the start or end value, such as [\v-...] or [...-\v],
+                // in which a single definite value (0x0B) is expected.
+                // For compatibility concern '\013'/0x0B is returned if isrange.
+
+                // 如果当前正在进行范围匹配，则直接将'\v'识别为返回VT，如[\v-a]，可以匹配0x0B至'a'的全部字符
+                if (isRange) return '\013';
+                // 如果当前未进行范围匹配
+                if (create)
+                    root = new VerticalWhiteSpace();
+                return -1;
+            case 'V':
+                if (create) root = new VerticalWhiteSpace().complement();
+                return -1;
+            case 'w':
+                if (create) root = new Ctype(ASCII.WORD);
+                return -1;
+            case 'W':
+                if (create) root = new Ctype(ASCII.WORD).complement();
+                return -1;
+            case 'a':
+                return '\007';
+            case 'e':
+                return '\033';
+            case 'f':
+                return '\f';
+            case 'n':
+                return '\n';
+            case 'r':
+                return '\r';
+            case 't':
+                return '\t';
+            case '0':
+                return octalEscape(); // 读取八进制，如'\077'转义为'?'字符
+            case 'c':
+                return controlEscape();
+            case 'u':
+                return u();
+            case 'x':
+                return hexadecimalEscape();
+            default:
+                return ch;
+        }
+    }
+
+    /**
      * 解析一个转义字符以决定它需要匹配的真实值.
      * 返回当前输入的转义字符，如果返回值小于0说明当前转义字符匹配到了特殊的规则，如'\w' '\d'等
      *
-     * @param create 匹配到转义符后是否往tree中增加新匹配节点，如'\w' '\d'等
+     * @param inclass 当前是否正在进行字符集匹配规则解析，即类似于[a-z\\]内部的解析，此时大部分转义符都直接忽略
+     * @param create  匹配到转义符后是否往tree中增加新匹配节点，如'\w' '\d'等
+     * @param isrange 是否是字符组[]内部的范围匹配，如[a\\bcd]
      */
     private int escape(boolean inclass, boolean create, boolean isrange) {
         int ch = skip(); // 当前字符为'\', 忽略它并取下一位
@@ -532,7 +611,7 @@ public final class Pattern {
                 if (inclass)
                     break;
                 if (create) {
-                    root = ref((ch - '0'));
+                    root = ref(ch - '0');
                 }
                 return -1;
             case 'A':
@@ -584,7 +663,7 @@ public final class Pattern {
                 return -1;
             case 'H':
                 if (create)
-                    root = new HorizWS().complement();
+                    root = new HorizontalWhiteSpace().complement();
                 return -1;
             case 'R':
                 if (inclass) break;
@@ -630,7 +709,7 @@ public final class Pattern {
                 return '\f';
             case 'h':
                 if (create)
-                    root = new HorizWS();
+                    root = new HorizontalWhiteSpace();
                 return -1;
             case 'k':
                 if (inclass)
@@ -688,74 +767,48 @@ public final class Pattern {
     }
 
     /**
-     * Parse a character class, and return the node that matches it.
-     * <p>
-     * Consumes a ] on the way out if consume is true.
-     * Usually consume is true except for the case of [abc&&def]
-     * where def is a separate right hand node with "understood" brackets.
+     * 解析并返回一类字符的匹配节点，用于支持中括号内部字符对输入字符的单字符匹配规则，比如[a-z]可以匹配任一单个字符。
      *
      * @param consume 通常情况下它都是true，除了[abc&&def]
      */
     private CharProperty clazz(boolean consume) {
         CharProperty prev = null;
         CharProperty node;
-        boolean include = true;
-        boolean firstInClass = true;
-        int ch = next();
-        for (; ; ) {
-            switch (ch) {
-                case '^':
-                    // Negates if first char in a class, otherwise literal
-                    if (firstInClass) {
-                        if (temp[cursor - 1] != '[')
-                            break;
-                        ch = next();
-                        include = !include;
-                        continue;
-                    } else {
-                        // ^ not first in class, treat as literal
-                        break;
-                    }
-                case '[':
-                    firstInClass = false;
-                    node = clazz(true);
-                    if (prev == null)
-                        prev = node;
-                    else
-                        prev = union(prev, node);
-                    ch = peek();
-                    continue;
-                case 0:
-                    firstInClass = false;
-                    if (cursor >= patternLength)
-                        throw error("Unclosed character class");
-                    break;
-                case ']':
-                    firstInClass = false;
-                    if (prev != null) {
-                        if (consume)
-                            next();
-                        return prev;
-                    }
-                    break;
-                default:
-                    firstInClass = false;
-                    break;
+        BitClass bits = new BitClass();
+        boolean include = true; // 标明当前字符组规则是include还是exclude，有^的话就是exclude
+        boolean first = true; // 标明当前匹配的是否是第一个字符，针对^有特殊的逻辑
+        for (int ch = next(); ; ) {
+            if (ch == 0 && cursor >= patternLength) {
+                throw error("Unclosed character class");
             }
-            node = range(new BitClass());
+            // 如果^在字符组[]的首位，则视为反义匹配，否则视为普通字符
+            if (ch == '^' && first) {
+                if (temp[cursor - 1] != '[') {
+                    System.out.println("first clazz's prefix not ["); // TODO 按说不可能
+                }
+                ch = next();
+                include = !include;
+                continue;
+            }
+            // 字符组以]结尾，但是[]这样的空字符组不合法
+            if (prev != null && ch == ']') {
+                if (consume)
+                    next();
+                return prev;
+            }
+            first = false;
+            node = clazzRange(bits);
             if (include) {
                 if (prev == null) {
                     prev = node;
-                } else {
-                    if (prev != node)
-                        prev = union(prev, node);
+                } else if (prev != node) {
+                    prev = union(prev, node);
                 }
             } else {
                 if (prev == null) {
                     prev = node.complement();
-                } else {
-                    if (prev != node)
-                        prev = setDifference(prev, node);
+                } else if (prev != node) {
+                    prev = setDifference(prev, node);
                 }
             }
             ch = peek();
@@ -789,13 +842,11 @@ public final class Pattern {
     /**
      * 解析字符类中的单个字符或字符范围并返回其代表节点。
      */
-    private CharProperty range(BitClass bits) {
+    private CharProperty clazzRange(BitClass bits) {
         int ch = peek();
         if (ch == '\\') {
-            next();
-            boolean isrange = (temp[cursor + 1] == '-');
-            unread();
-            ch = escape(true, true, isrange);
+            boolean isrange = (temp[cursor + 2] == '-');
+            ch = clazzEscape(true, isrange);
             if (ch == -1)
                 return (CharProperty) root;
         } else {
@@ -811,7 +862,7 @@ public final class Pattern {
                     next();
                     int m = peek();
                     if (m == '\\') {
-                        m = escape(true, false, true);
+                        m = clazzEscape(false, true);
                     } else {
                         next();
                     }
@@ -1127,7 +1178,7 @@ public final class Pattern {
     }
 
     /**
-     * Utility method for parsing control escape sequences.
+     * 解析CTRL+?的转义符工具类, 例如将'\ca'解析为'CTRL+a'，ASCII值为1
      */
     private int controlEscape() {
         if (cursor < patternLength) {
@@ -1658,7 +1709,7 @@ public final class Pattern {
     /**
      * Node class that matches a Perl horizontal whitespace
      */
-    static final class HorizWS extends BmpCharProperty {
+    static final class HorizontalWhiteSpace extends BmpCharProperty {
         boolean isSatisfiedBy(int cp) {
             return cp == 0x09 || cp == 0x20 || cp == 0xa0 ||
                     cp == 0x1680 || cp == 0x180e ||
