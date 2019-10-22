@@ -63,12 +63,12 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 public class MapBenchmark {
 
-    private static final Map<String, Object> HASH_MAP = new HashMap<>();
-    private static final Map<String, Object> TREE_MAP = new TreeMap<>();
-    private static final Map<String, Object> LINKED_MAP = new LinkedHashMap<>();
+    private static final Map<String, Object> HASH_MAP       = new HashMap<>();
+    private static final Map<String, Object> TREE_MAP       = new TreeMap<>();
+    private static final Map<String, Object> LINKED_MAP     = new LinkedHashMap<>();
     private static final Map<String, Object> CONCURRENT_MAP = new ConcurrentHashMap<>();
-    private static final String KEY = RandomStringUtils.randomAlphanumeric(16);
-    private static final int INIT_SIZE = 128;
+    private static final String              KEY            = RandomStringUtils.randomAlphanumeric(16);
+    private static final int                 INIT_SIZE      = 128;
 
     static {
         for (int i = 0; i < INIT_SIZE; i++) {
