@@ -8,17 +8,18 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * 测试一下字符串数组的hashcode效率
- * Benchmark                 Mode  Cnt  Score   Error  Units
- * HashCodeBenchmark.array   avgt    9  1.029 ± 0.007  ns/op
- * HashCodeBenchmark.normal  avgt    9  1.027 ± 0.005  ns/op
- * HashCodeBenchmark.string  avgt    9  0.771 ± 0.003  ns/op
+ * Benchmark                   Mode  Cnt  Score   Error  Units
+ * HashCodeBenchmark.array     avgt    6  1.036 ± 0.005  ns/op
+ * HashCodeBenchmark.hashcode  avgt    6  1.038 ± 0.006  ns/op
+ * HashCodeBenchmark.normal    avgt    6  1.033 ± 0.002  ns/op
+ * HashCodeBenchmark.string    avgt    6  0.776 ± 0.005  ns/op
  *
  * @author sulin
  * @since 2019-09-27 12:06:58
  */
 @Warmup(iterations = 2, time = 2)
 @BenchmarkMode(Mode.AverageTime)
-@Fork(3)
+@Fork(2)
 @Measurement(iterations = 3, time = 3)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 public class HashCodeBenchmark {
@@ -45,6 +46,11 @@ public class HashCodeBenchmark {
     @Benchmark
     public void normal() {
         System.identityHashCode(ARR);
+    }
+
+    @Benchmark
+    public void hashcode() {
+        String.class.hashCode();
     }
 
 }
