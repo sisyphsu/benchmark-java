@@ -13,7 +13,6 @@
         <module>algorithm</module>
         <module>benchmark</module>
         <module>import-test</module>
-        <module>date-parser</module>
     </modules>
 
     <build>
